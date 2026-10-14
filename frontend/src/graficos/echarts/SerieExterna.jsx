@@ -64,6 +64,7 @@ export function SerieExterna() {
   return (
     <Tarjeta
       titulo="Tasas de defunciones por causas externas por 100.000 habitantes según sexo"
+      ayuda="Defunciones por causas externas por cada 100.000 habitantes, separadas por sexo y año. Las causas externas consideradas son homicidios, suicidios, accidentes de tránsito, otros accidentes y otras externas."
       cargando={cargando && filas.length === 0}
       error={error}
     >

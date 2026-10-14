@@ -122,6 +122,7 @@ export function EvolucionRelacion() {
   return (
     <Tarjeta
       titulo="Evolución de defunciones por 100 nacimientos"
+      ayuda="Muestra cuántas defunciones se registraron por cada 100 nacimientos en cada año. Al elegir un departamento o municipio, compara su evolución con el total nacional. Es una razón entre registros vitales, no una tasa por población ni una probabilidad individual."
       cargando={cargando && filas.length === 0}
       error={error}
     >

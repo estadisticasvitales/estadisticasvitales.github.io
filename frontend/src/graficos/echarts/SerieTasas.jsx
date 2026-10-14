@@ -33,7 +33,7 @@ function linea(id, nombre, color, datos, { comparar = false, area = false, markL
   };
 }
 
-export function SerieTasas({ sql, natalidad = true, mortalidad = true }) {
+export function SerieTasas({ sql, natalidad = true, mortalidad = true, ayuda }) {
   const { filtros } = useFiltros();
   const { catalogos } = useDatos();
   const comparar = filtros.departamento !== "Todos" || filtros.municipio !== "Todos";
@@ -85,6 +85,7 @@ export function SerieTasas({ sql, natalidad = true, mortalidad = true }) {
   return (
     <Tarjeta
       titulo="Tasas brutas de mortalidad por 1.000 habitantes"
+      ayuda={ayuda}
       cargando={cargando && filas.length === 0}
       error={error}
     >

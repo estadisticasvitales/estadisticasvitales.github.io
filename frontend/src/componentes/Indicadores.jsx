@@ -1,7 +1,12 @@
-export function Indicador({ titulo, valor, tono, clase = "", estilo, variacion = null }) {
+import { Ayuda } from "@/componentes/Tarjeta";
+
+export function Indicador({ titulo, valor, tono, clase = "", estilo, variacion = null, ayuda }) {
   return (
     <article className={`indicador tono-${tono} ${clase}`.trim()} style={estilo}>
-      <span>{titulo}</span>
+      <span className={ayuda ? "indicador-titulo-con-ayuda" : undefined}>
+        {titulo}
+        {ayuda ? <Ayuda texto={ayuda} /> : null}
+      </span>
       <strong>
         {variacion == null ? (
           valor

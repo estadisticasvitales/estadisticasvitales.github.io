@@ -201,6 +201,7 @@ export function CambioTgf({ sql }) {
   return (
     <Tarjeta
       titulo="Cambio de la tasa global de fecundidad"
+      ayuda="Cambio porcentual de la TGF entre el primer y el último año disponible para cada departamento. Los puntos muestran las tasas de inicio y fin; las flechas indican la dirección del cambio."
       cargando={cargando && datos.length === 0}
       error={error}
     >

@@ -64,6 +64,7 @@ export function ComparacionSexo() {
   return (
     <Tarjeta
       titulo="Nacimientos y defunciones por sexo"
+      ayuda="Compara el número absoluto de nacimientos y defunciones registrados para hombres y mujeres en el territorio y año seleccionados. No es una tasa ni una razón por cada 100 nacimientos."
       cargando={cargando && filas.length === 0}
       error={error}
     >

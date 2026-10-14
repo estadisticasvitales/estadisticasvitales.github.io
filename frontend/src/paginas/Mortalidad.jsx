@@ -68,14 +68,22 @@ export function Mortalidad() {
         <div className="rejilla-completa">
           <DefuncionesAnio />
         </div>
-        <SerieTasas sql={sqlSerieTasas(filtros)} natalidad={false} />
-        <PiramideTasas sql={sqlMortalidadEdad(filtros)} />
+        <SerieTasas
+          sql={sqlSerieTasas(filtros)}
+          natalidad={false}
+          ayuda="Defunciones registradas por cada 1.000 habitantes proyectados. La serie sigue los años disponibles y, cuando se elige un territorio, permite compararlo con el total nacional."
+        />
+        <PiramideTasas
+          sql={sqlMortalidadEdad(filtros)}
+          ayuda="Defunciones por cada 1.000 habitantes de cada grupo de edad y sexo. Se excluye la edad desconocida; las barras permiten comparar las tasas específicas entre hombres y mujeres."
+        />
         <RankingTasas
           titulo="Mortalidad estandarizada más alta"
           sql={sqlRankingEstandar(filtros)}
           color={COLORES_TEMA.defunciones}
           formato={decimal}
           nombre="Por 1.000"
+          ayuda="Ordena los territorios con mayor tasa de mortalidad estandarizada por edad. La estandarización directa aplica a las tasas específicas los pesos de la población de Colombia de 2019, para hacer comparables territorios con distinta estructura etaria. Unidad: defunciones por 1.000 habitantes."
         />
         <MapaCoropletas
           titulo="Mortalidad estandarizada por edad"
@@ -83,6 +91,7 @@ export function Mortalidad() {
           colores={ESCALA_RIESGO}
           formato={decimal}
           unidad="Por 1.000 (estándar 2019)"
+          ayuda="Representa la tasa de mortalidad estandarizada por edad en cada territorio, por cada 1.000 habitantes. Usa como referencia la estructura por edades de la población de Colombia de 2019; así se reduce el efecto de que los territorios tengan poblaciones de edades diferentes."
         />
       </div>
     </>

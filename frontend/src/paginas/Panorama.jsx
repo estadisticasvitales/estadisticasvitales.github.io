@@ -81,6 +81,7 @@ export function Panorama() {
           titulo="Defunciones por 100 nacimientos"
           valor={relacion == null ? "—" : decimal(relacion)}
           tono="relacion"
+          ayuda="Razón entre los registros del territorio y año seleccionados: número de defunciones por cada 100 nacimientos. No representa una tasa por población ni una probabilidad individual."
           variacion={cambios.relacion}
         />
         <Indicador
