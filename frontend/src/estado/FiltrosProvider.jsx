@@ -9,6 +9,10 @@ const INICIAL = {
   municipio: "Todos",
   causa: "Todas",
   externa: "Todas",
+  edadMadre: "Todos",
+  nivelEducativo: "Todos",
+  regimen: "Todos",
+  tipoParto: "Todos",
 };
 
 export function FiltrosProvider({ children }) {
@@ -38,6 +42,10 @@ export function FiltrosProvider({ children }) {
           municipio: "Todos",
           causa: "Todas",
           externa: "Todas",
+          edadMadre: "Todos",
+          nivelEducativo: "Todos",
+          regimen: "Todos",
+          tipoParto: "Todos",
         }));
       },
     }),

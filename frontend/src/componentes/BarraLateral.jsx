@@ -23,8 +23,9 @@ export function BarraLateral({ pagina }) {
     useConsulta(consultaCausas);
 
   const anios = useMemo(
-    () => catalogos.anios.map((anio) => ({ valor: String(anio), etiqueta: String(anio) })),
-    [catalogos.anios],
+    () => (pagina === "intervalos" ? catalogos.aniosIntervalos : catalogos.anios)
+      .map((anio) => ({ valor: String(anio), etiqueta: String(anio) })),
+    [catalogos.anios, catalogos.aniosIntervalos, pagina],
   );
 
   const departamentos = useMemo(
@@ -64,11 +65,23 @@ export function BarraLateral({ pagina }) {
     if (!sigue) actualizar("causa", "Todas");
   }, [actualizar, cargandoCausas, causasDisponibles, errorCausas, filtros.causa, pagina]);
 
+  useEffect(() => {
+    if (pagina !== "intervalos" || !catalogos.aniosIntervalos.length) return;
+    const anioActual = Number(filtros.anio);
+    if (!catalogos.aniosIntervalos.includes(anioActual)) {
+      actualizar("anio", String(catalogos.aniosIntervalos[0]));
+    }
+  }, [actualizar, catalogos.aniosIntervalos, filtros.anio, pagina]);
+
   const hayFiltros =
     filtros.departamento !== "Todos" ||
-    filtros.municipio !== "Todos" ||
-    filtros.causa !== "Todas" ||
-    filtros.externa !== "Todas";
+    (pagina !== "intervalos" && filtros.municipio !== "Todos") ||
+    (pagina === "causas" && filtros.causa !== "Todas") ||
+    (pagina === "externas" && filtros.externa !== "Todas") ||
+    (pagina === "intervalos" &&
+      [filtros.edadMadre, filtros.nivelEducativo, filtros.regimen, filtros.tipoParto].some(
+        (valor) => valor !== "Todos",
+      ));
 
   return (
     <aside className="barra">
@@ -102,14 +115,52 @@ export function BarraLateral({ pagina }) {
         opciones={departamentos}
         alElegir={(siguiente) => actualizar("departamento", siguiente)}
       />
-      <Buscador
-        etiqueta="Municipio"
-        valor={filtros.municipio}
-        vacioValor="Todos"
-        vacioEtiqueta="Todos"
-        opciones={municipios}
-        alElegir={(siguiente) => actualizar("municipio", siguiente)}
-      />
+      {pagina !== "intervalos" ? (
+        <Buscador
+          etiqueta="Municipio"
+          valor={filtros.municipio}
+          vacioValor="Todos"
+          vacioEtiqueta="Todos"
+          opciones={municipios}
+          alElegir={(siguiente) => actualizar("municipio", siguiente)}
+        />
+      ) : null}
+      {pagina === "intervalos" ? (
+        <>
+          <Buscador
+            etiqueta="Edad de la madre"
+            valor={filtros.edadMadre}
+            vacioValor="Todos"
+            vacioEtiqueta="Todas"
+            opciones={catalogos.filtrosIntervalos.edadMadre.map((valor) => ({ valor, etiqueta: valor }))}
+            alElegir={(siguiente) => actualizar("edadMadre", siguiente)}
+          />
+          <Buscador
+            etiqueta="Educación de la madre"
+            valor={filtros.nivelEducativo}
+            vacioValor="Todos"
+            vacioEtiqueta="Todos los niveles"
+            opciones={catalogos.filtrosIntervalos.nivelEducativo.map((valor) => ({ valor, etiqueta: valor }))}
+            alElegir={(siguiente) => actualizar("nivelEducativo", siguiente)}
+          />
+          <Buscador
+            etiqueta="Régimen de salud"
+            valor={filtros.regimen}
+            vacioValor="Todos"
+            vacioEtiqueta="Todos"
+            opciones={catalogos.filtrosIntervalos.regimen.map((valor) => ({ valor, etiqueta: valor }))}
+            alElegir={(siguiente) => actualizar("regimen", siguiente)}
+          />
+          <Buscador
+            etiqueta="Tipo de parto"
+            valor={filtros.tipoParto}
+            vacioValor="Todos"
+            vacioEtiqueta="Todos"
+            opciones={catalogos.filtrosIntervalos.tipoParto.map((valor) => ({ valor, etiqueta: valor }))}
+            alElegir={(siguiente) => actualizar("tipoParto", siguiente)}
+          />
+        </>
+      ) : null}
       {pagina === "causas" ? (
         <Buscador
           etiqueta="Causa de defunción"

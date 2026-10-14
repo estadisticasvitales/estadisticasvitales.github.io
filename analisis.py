@@ -123,6 +123,37 @@ def _texto(df: pd.DataFrame, columnas: tuple[str, ...]) -> pd.DataFrame:
     return df
 
 
+def cargar_intervalos(conn) -> pd.DataFrame:
+    """Agrega intervalos, ocurrencia y resultados neonatales por celdas publicables."""
+    return db._consultar(
+        conn,
+        """
+        SELECT anio,
+               cod_dpto AS cod_departamento,
+               departamento_ocurrencia AS departamento,
+               edad_madre_cat,
+               niv_edum_cat,
+               seg_social_cat,
+               tipo_parto_cat,
+               categoria_intervalo,
+               FLOOR(meses)::int AS mes_bin,
+               COUNT(*)::bigint AS registros,
+               SUM(meses)::double precision AS suma_meses,
+               COUNT(*) FILTER (WHERE flag_bajo_peso IS NOT NULL)::bigint AS n_bajo_peso_evaluable,
+               COUNT(*) FILTER (WHERE flag_bajo_peso IS TRUE)::bigint AS n_bajo_peso,
+               COUNT(*) FILTER (WHERE flag_prematuro IS NOT NULL)::bigint AS n_prematuro_evaluable,
+               COUNT(*) FILTER (WHERE flag_prematuro IS TRUE)::bigint AS n_prematuro,
+               COUNT(*) FILTER (WHERE flag_apgar_bajo IS NOT NULL)::bigint AS n_apgar_bajo_evaluable,
+               COUNT(*) FILTER (WHERE flag_apgar_bajo IS TRUE)::bigint AS n_apgar_bajo,
+               COUNT(*) FILTER (WHERE flag_adverso_compuesto IS NOT NULL)::bigint AS n_adverso_evaluable,
+               COUNT(*) FILTER (WHERE flag_adverso_compuesto IS TRUE)::bigint AS n_adverso
+        FROM nacimientos.mv_intervalos
+        GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+        """,
+        (),
+    )
+
+
 def cargar_analisis() -> dict:
     global _ANALISIS
     if _ANALISIS is not None:
@@ -261,6 +292,7 @@ def cargar_analisis() -> dict:
             """,
             (),
         )
+        intervalos = cargar_intervalos(conn)
     finally:
         conn.close()
 
@@ -270,7 +302,7 @@ def cargar_analisis() -> dict:
         "cod_municipio",
         "municipio",
     )
-    for frame in (poblacion, poblacion_area, nac_edad, nac_perfil, def_edad, externas):
+    for frame in (poblacion, poblacion_area, nac_edad, nac_perfil, def_edad, externas, intervalos):
         db._enteros(frame, ("anio",))
         _texto(frame, geo)
 
@@ -294,6 +326,34 @@ def cargar_analisis() -> dict:
     )
     _texto(def_edad, ("grupo_edad", "sexo"))
     _texto(externas, ("causa",))
+    _texto(
+        intervalos,
+        (
+            "departamento",
+            "edad_madre_cat",
+            "niv_edum_cat",
+            "seg_social_cat",
+            "tipo_parto_cat",
+            "categoria_intervalo",
+        ),
+    )
+    db._enteros(
+        intervalos,
+        (
+            "anio",
+            "mes_bin",
+            "registros",
+            "n_bajo_peso_evaluable",
+            "n_bajo_peso",
+            "n_prematuro_evaluable",
+            "n_prematuro",
+            "n_apgar_bajo_evaluable",
+            "n_apgar_bajo",
+            "n_adverso_evaluable",
+            "n_adverso",
+        ),
+    )
+    intervalos["suma_meses"] = pd.to_numeric(intervalos["suma_meses"], errors="coerce").fillna(0)
 
     _ANALISIS = {
         "poblacion": poblacion,
@@ -302,5 +362,6 @@ def cargar_analisis() -> dict:
         "nac_perfil": nac_perfil,
         "def_edad": def_edad,
         "externas": externas,
+        "intervalos": intervalos,
     }
     return _ANALISIS

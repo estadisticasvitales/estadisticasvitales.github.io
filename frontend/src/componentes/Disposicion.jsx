@@ -4,6 +4,7 @@ import { CaidaNatalidad } from "@/paginas/CaidaNatalidad";
 import { CausasExternas } from "@/paginas/CausasExternas";
 import { Defunciones } from "@/paginas/Defunciones";
 import { Fecundidad } from "@/paginas/Fecundidad";
+import { IntervalosIntergenesicos } from "@/paginas/IntervalosIntergenesicos";
 import { Mortalidad } from "@/paginas/Mortalidad";
 import { Panorama } from "@/paginas/Panorama";
 
@@ -19,6 +20,7 @@ const MENU = [
     hijos: [
       { id: "caida", titulo: "Natalidad" },
       { id: "fecundidad", titulo: "Fecundidad" },
+      { id: "intervalos", titulo: "Intervalos Intergenésicos" },
     ],
   },
   {
@@ -35,6 +37,7 @@ const MENU = [
 const PAGINAS = {
   panorama: Panorama,
   fecundidad: Fecundidad,
+  intervalos: IntervalosIntergenesicos,
   caida: CaidaNatalidad,
   causas: Defunciones,
   mortalidad: Mortalidad,

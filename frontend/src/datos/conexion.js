@@ -8,6 +8,7 @@ const ARCHIVOS = [
   "nac_perfil.parquet",
   "def_edad.parquet",
   "externas.parquet",
+  "intervalos.parquet",
 ];
 
 let inicio;
@@ -45,6 +46,7 @@ async function iniciar() {
     CREATE TABLE nac_perfil AS SELECT * FROM read_parquet('nac_perfil.parquet');
     CREATE TABLE def_edad AS SELECT * FROM read_parquet('def_edad.parquet');
     CREATE TABLE externas AS SELECT * FROM read_parquet('externas.parquet');
+    CREATE TABLE intervalos AS SELECT * FROM read_parquet('intervalos.parquet');
   `);
 
   let cola = Promise.resolve();

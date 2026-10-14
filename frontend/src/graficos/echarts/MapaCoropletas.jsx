@@ -56,6 +56,8 @@ export function MapaCoropletas({
   titulo,
   sql,
   municipal = false,
+  ignorarMunicipio = false,
+  soloDepartamentos = false,
   colores,
   cortes,
   formato = decimal,
@@ -66,11 +68,12 @@ export function MapaCoropletas({
   const { catalogos } = useDatos();
   const { capas, error: errorMapa } = useGeometria();
   const { filas, cargando, error } = useConsulta(sql);
+  const filtrosMapa = ignorarMunicipio ? { ...filtros, municipio: "Todos" } : filtros;
   const coleccion = useMemo(
-    () => (capas ? recortar(capas, filtros, catalogos.municipios, { municipal }) : null),
-    [capas, catalogos.municipios, filtros, municipal],
+    () => (capas ? recortar(capas, filtrosMapa, catalogos.municipios, { municipal, soloDepartamentos }) : null),
+    [capas, catalogos.municipios, filtrosMapa, municipal, soloDepartamentos],
   );
-  const nombreMapa = `coropletas-${municipal ? "mun" : "dep"}-${filtros.departamento}-${filtros.municipio}`;
+  const nombreMapa = `coropletas-${municipal ? "mun" : "dep"}-${filtros.departamento}-${filtrosMapa.municipio}`;
 
   const escala = useMemo(() => {
     const valores = filas.map((fila) => fila.valor).filter((valor) => Number.isFinite(valor));
