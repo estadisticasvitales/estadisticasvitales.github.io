@@ -1,5 +1,5 @@
 import * as echarts from "echarts/core";
-import { BarChart, CustomChart, LineChart, MapChart, ScatterChart } from "echarts/charts";
+import { BarChart, BoxplotChart, CustomChart, HeatmapChart, LineChart, MapChart, ScatterChart } from "echarts/charts";
 import {
   GraphicComponent,
   GridComponent,
@@ -7,15 +7,18 @@ import {
   MarkAreaComponent,
   MarkLineComponent,
   TooltipComponent,
+  VisualMapComponent,
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer } from "echarts/renderers";
 
 echarts.use([
   BarChart,
+  BoxplotChart,
   CustomChart,
   LineChart,
   MapChart,
+  HeatmapChart,
   ScatterChart,
   GraphicComponent,
   GridComponent,
@@ -23,6 +26,7 @@ echarts.use([
   MarkAreaComponent,
   MarkLineComponent,
   TooltipComponent,
+  VisualMapComponent,
   LabelLayout,
   UniversalTransition,
   CanvasRenderer,

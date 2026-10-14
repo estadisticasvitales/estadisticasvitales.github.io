@@ -19,6 +19,142 @@ export function whereTerritorio(filtros, { anio = true, tabla = "" } = {}) {
   return partes.length ? partes.join(" AND ") : "TRUE";
 }
 
+const EDAD_MADRE_GRUPO_SQL = `CASE
+  WHEN edad_madre_cat IN ('10-14 años', '15-19 años') THEN '10-19 años'
+  WHEN edad_madre_cat IN ('20-24 años', '25-29 años') THEN '20-29 años'
+  WHEN edad_madre_cat IN ('30-34 años', '35-39 años') THEN '30-39 años'
+  WHEN edad_madre_cat IN ('40-44 años', '45-49 años') THEN '40-49 años'
+  WHEN edad_madre_cat = '50-54 años' THEN '50-59 años'
+  ELSE edad_madre_cat
+END`;
+
+const NIVEL_EDUCATIVO_GRUPO_SQL = `CASE
+  WHEN niv_edum_cat IN ('Especialización', 'Maestría', 'Doctorado') THEN 'Posgrado'
+  WHEN niv_edum_cat IN ('Normalista', 'Técnica profesional', 'Tecnológica') THEN 'Técnica/Tecnológica'
+  ELSE niv_edum_cat
+END`;
+
+const FILTROS_INTERVALOS = {
+  edadMadre: { columna: EDAD_MADRE_GRUPO_SQL },
+  nivelEducativo: { columna: NIVEL_EDUCATIVO_GRUPO_SQL },
+  regimen: "seg_social_cat",
+  tipoParto: "tipo_parto_cat",
+};
+
+export function whereIntervalos(filtros) {
+  const partes = [];
+  if (filtros.anio && filtros.anio !== "Todos") partes.push(`anio = ${Number(filtros.anio)}`);
+  if (filtros.departamento && filtros.departamento !== "Todos") {
+    partes.push(`departamento = ${literal(filtros.departamento)}`);
+  }
+  for (const [filtro, definicion] of Object.entries(FILTROS_INTERVALOS)) {
+    if (filtros[filtro] && filtros[filtro] !== "Todos") {
+      const columna = typeof definicion === "string" ? definicion : definicion.columna;
+      partes.push(`${columna} = ${literal(filtros[filtro])}`);
+    }
+  }
+  return partes.length ? partes.join(" AND ") : "TRUE";
+}
+
+export function sqlIntervalosDistribucion(filtros) {
+  return `
+    SELECT FLOOR(mes_bin / 6) * 6 AS mes_inicio,
+           SUM(registros)::DOUBLE AS registros
+    FROM intervalos
+    WHERE ${whereIntervalos(filtros)}
+    GROUP BY 1
+    ORDER BY 1
+  `;
+}
+
+export function sqlIntervalosResumen(filtros) {
+  return `
+    SELECT mes_bin,
+           SUM(registros)::DOUBLE AS registros,
+           SUM(suma_meses)::DOUBLE AS suma_meses,
+           SUM(n_bajo_peso_evaluable)::DOUBLE AS n_bajo_peso_evaluable,
+           SUM(n_bajo_peso)::DOUBLE AS n_bajo_peso,
+           SUM(n_prematuro_evaluable)::DOUBLE AS n_prematuro_evaluable,
+           SUM(n_prematuro)::DOUBLE AS n_prematuro,
+           SUM(n_apgar_bajo_evaluable)::DOUBLE AS n_apgar_bajo_evaluable,
+           SUM(n_apgar_bajo)::DOUBLE AS n_apgar_bajo,
+           SUM(n_adverso_evaluable)::DOUBLE AS n_adverso_evaluable,
+           SUM(n_adverso)::DOUBLE AS n_adverso
+    FROM intervalos
+    WHERE ${whereIntervalos(filtros)}
+    GROUP BY 1
+    ORDER BY 1
+  `;
+}
+
+export function sqlIntervalosCategorias(filtros) {
+  return `
+    SELECT categoria_intervalo,
+           SUM(registros)::DOUBLE AS registros
+    FROM intervalos
+    WHERE ${whereIntervalos(filtros)}
+    GROUP BY 1
+    ORDER BY categoria_intervalo
+  `;
+}
+
+export function sqlBoxplotIntervalos(filtros) {
+  return `
+    SELECT edad_madre_cat,
+           mes_bin,
+           SUM(registros)::DOUBLE AS registros
+    FROM intervalos
+    WHERE ${whereIntervalos(filtros)}
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+  `;
+}
+
+export function sqlHeatmapIntervalos(filtros) {
+  return `
+    SELECT ${EDAD_MADRE_GRUPO_SQL} AS edad_madre_grupo,
+           ${NIVEL_EDUCATIVO_GRUPO_SQL} AS nivel_educativo_grupo,
+           SUM(registros)::DOUBLE AS registros,
+           SUM(CASE WHEN categoria_intervalo IN ('1. Corto (<18m)', '2. Subóptimo (18-23m)') THEN registros ELSE 0 END)::DOUBLE AS menores_24
+    FROM intervalos
+    WHERE ${whereIntervalos(filtros)}
+    GROUP BY 1, 2
+    ORDER BY 1, 2
+  `;
+}
+
+export function sqlResultadosIntervalos(filtros) {
+  return `
+    SELECT categoria_intervalo,
+           SUM(n_bajo_peso_evaluable)::DOUBLE AS n_bajo_peso_evaluable,
+           SUM(n_bajo_peso)::DOUBLE AS n_bajo_peso,
+           SUM(n_prematuro_evaluable)::DOUBLE AS n_prematuro_evaluable,
+           SUM(n_prematuro)::DOUBLE AS n_prematuro,
+           SUM(n_apgar_bajo_evaluable)::DOUBLE AS n_apgar_bajo_evaluable,
+           SUM(n_apgar_bajo)::DOUBLE AS n_apgar_bajo,
+           SUM(n_adverso_evaluable)::DOUBLE AS n_adverso_evaluable,
+           SUM(n_adverso)::DOUBLE AS n_adverso
+    FROM intervalos
+    WHERE ${whereIntervalos(filtros)}
+    GROUP BY 1
+    ORDER BY categoria_intervalo
+  `;
+}
+
+export function sqlMapaIntervalos(filtros) {
+  return `
+    SELECT cod_departamento AS codigo,
+           MAX(departamento) AS nombre,
+           '' AS detalle,
+           SUM(registros)::DOUBLE AS hechos,
+           100 * SUM(CASE WHEN categoria_intervalo IN ('1. Corto (<18m)', '2. Subóptimo (18-23m)') THEN registros ELSE 0 END)
+             / NULLIF(SUM(registros), 0) AS valor
+    FROM intervalos
+    WHERE ${whereIntervalos(filtros)}
+    GROUP BY cod_departamento
+  `;
+}
+
 export function whereCausas(filtros, opciones = {}) {
   const base = whereTerritorio(filtros, opciones);
   if (!filtros.causa || filtros.causa === "Todas") return base;
@@ -692,7 +828,7 @@ export function sqlPerfilEdadMadre(filtros, anioBase, anioActual) {
 }
 
 export async function cargarCatalogos(consultar) {
-  const [anios, departamentos, municipios] = await Promise.all([
+  const [anios, departamentos, municipios, aniosIntervalos, edadMadre, nivelEducativo, regimenes, tiposParto] = await Promise.all([
     consultar("SELECT DISTINCT anio FROM panorama ORDER BY anio DESC"),
     consultar(
       "SELECT DISTINCT departamento FROM geografia WHERE departamento <> '' ORDER BY departamento",
@@ -701,6 +837,11 @@ export async function cargarCatalogos(consultar) {
       SELECT cod_departamento, departamento, cod_municipio, municipio
       FROM geografia
     `),
+    consultar("SELECT DISTINCT anio FROM intervalos ORDER BY anio DESC"),
+    consultar(`SELECT DISTINCT ${EDAD_MADRE_GRUPO_SQL} AS valor FROM intervalos ORDER BY 1`),
+    consultar(`SELECT DISTINCT ${NIVEL_EDUCATIVO_GRUPO_SQL} AS valor FROM intervalos ORDER BY 1`),
+    consultar("SELECT DISTINCT seg_social_cat AS valor FROM intervalos ORDER BY 1"),
+    consultar("SELECT DISTINCT tipo_parto_cat AS valor FROM intervalos ORDER BY 1"),
   ]);
 
   return {
@@ -709,5 +850,12 @@ export async function cargarCatalogos(consultar) {
       .map((fila) => fila.departamento)
       .sort((a, b) => a.localeCompare(b, "es")),
     municipios: municipios.sort((a, b) => a.municipio.localeCompare(b.municipio, "es")),
+    aniosIntervalos: aniosIntervalos.map((fila) => fila.anio),
+    filtrosIntervalos: {
+      edadMadre: edadMadre.map((fila) => fila.valor),
+      nivelEducativo: nivelEducativo.map((fila) => fila.valor),
+      regimen: regimenes.map((fila) => fila.valor),
+      tipoParto: tiposParto.map((fila) => fila.valor),
+    },
   };
 }

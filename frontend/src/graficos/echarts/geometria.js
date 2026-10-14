@@ -37,7 +37,8 @@ export function useGeometria() {
   return estado;
 }
 
-export function recortar(capas, filtros, municipios, { municipal = false } = {}) {
+export function recortar(capas, filtros, municipios, { municipal = false, soloDepartamentos = false } = {}) {
+  if (soloDepartamentos) return capas.departamentos;
   if (filtros.municipio !== "Todos") {
     const codigo = filtros.municipio.split("|")[1];
     return {

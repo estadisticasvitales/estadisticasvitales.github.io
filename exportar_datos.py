@@ -83,6 +83,21 @@ def main() -> None:
         "nac_perfil.parquet": recorte(extra["nac_perfil"], ("nacimientos",)),
         "def_edad.parquet": recorte(extra["def_edad"], ("defunciones",)),
         "externas.parquet": recorte(extra["externas"], ("defunciones",)),
+        "intervalos.parquet": recorte(
+            extra["intervalos"],
+            (
+                "mes_bin",
+                "registros",
+                "n_bajo_peso_evaluable",
+                "n_bajo_peso",
+                "n_prematuro_evaluable",
+                "n_prematuro",
+                "n_apgar_bajo_evaluable",
+                "n_apgar_bajo",
+                "n_adverso_evaluable",
+                "n_adverso",
+            ),
+        ),
     }
     for nombre, tabla in archivos.items():
         ruta = escribir(tabla, nombre)
