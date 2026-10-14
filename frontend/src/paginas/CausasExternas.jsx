@@ -113,6 +113,7 @@ export function CausasExternas() {
           formato={decimal}
           unidad="Por 100.000"
           hechoEtiqueta="Defunciones"
+          ayuda="Defunciones por causa externa por cada 100.000 habitantes, desagregadas por municipio. Si se selecciona una causa específica, el mapa muestra esa causa; con ‘Todas’, reúne homicidios, suicidios, accidentes de tránsito, otros accidentes y otras externas."
         />
         <Piramide
           titulo="Defunciones por causas externas por grupo etario y sexo"

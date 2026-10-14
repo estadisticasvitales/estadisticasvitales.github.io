@@ -348,6 +348,12 @@ button, select, input { font: inherit; }
 }
 
 .indicador > span { display: block; font-size: 0.82rem; opacity: 0.92; }
+.indicador > span.indicador-titulo-con-ayuda {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
 .indicador strong { display: block; margin-top: 0.35rem; font-size: 1.45rem; }
 .indicador .valor-indicador {
   display: flex;
@@ -453,11 +459,86 @@ button, select, input { font: inherit; }
   font-weight: 600;
 }
 
+.tarjeta h2.tarjeta-titulo-con-ayuda {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.ancla-ayuda { position: relative; display: inline-flex; flex: none; }
+
+.boton-ayuda {
+  display: inline-grid;
+  width: 1.2rem;
+  height: 1.2rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #94a3b8;
+  border-radius: 50%;
+  background: #fff;
+  color: #475569;
+  font-size: 0.76rem;
+  font-weight: 650;
+  line-height: 1;
+  cursor: help;
+}
+
+.boton-ayuda:hover,
+.boton-ayuda:focus-visible {
+  border-color: #2ec7c9;
+  color: #087f81;
+  outline: 2px solid rgb(46 199 201 / 25%);
+  outline-offset: 2px;
+}
+
+.nota-ayuda {
+  display: none;
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: max-content;
+  max-width: min(20rem, calc(100vw - 2.5rem));
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e4eef6;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 14%);
+  color: #334155;
+  font-size: 0.78rem;
+  font-weight: 450;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.ancla-ayuda:hover .nota-ayuda,
+.nota-ayuda.visible { display: block; }
+
 .tarjeta-cuerpo {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
+}
+
+.selector-grafico {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 0.25rem;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.selector-grafico select {
+  max-width: 100%;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #e4eef6;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 .grafica-echarts {

@@ -14,6 +14,7 @@ export function RankingTasas({
   nombre = "Tasa",
   vacio = "No hay tasas para este territorio.",
   referencias = [],
+  ayuda,
 }) {
   const { filas, cargando, error } = useConsulta(sql);
   const datos = useMemo(() => filas.filter((fila) => Number.isFinite(fila.valor)), [filas]);
@@ -86,7 +87,7 @@ export function RankingTasas({
   }, [color, datos, formato, nombre, referencias]);
 
   return (
-    <Tarjeta titulo={titulo} cargando={cargando && datos.length === 0} error={error}>
+    <Tarjeta titulo={titulo} ayuda={ayuda} cargando={cargando && datos.length === 0} error={error}>
       {datos.length === 0 && !cargando ? (
         <Vacio>{vacio}</Vacio>
       ) : (

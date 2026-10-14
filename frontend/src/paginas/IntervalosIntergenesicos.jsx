@@ -1,7 +1,7 @@
 import { FilaIndicadores, Indicador } from "@/componentes/Indicadores";
 import {
   sqlIntervalosCategorias,
-  sqlBoxplotIntervalos,
+  sqlRiesgoRelativoIntervalos,
   sqlIntervalosDistribucion,
   sqlHeatmapIntervalos,
   sqlIntervalosResumen,
@@ -12,7 +12,7 @@ import { useConsulta } from "@/datos/useConsulta";
 import { useFiltros } from "@/estado/FiltrosProvider";
 import { decimal, entero } from "@/estilos/tema";
 import { CategoriasIntervalos, DistribucionIntervalos, ResultadosIntervalos } from "@/graficos/echarts/IntervalosGraficos";
-import { BoxplotIntervalos, HeatmapIntervalos } from "@/graficos/echarts/IntervalosComparativos";
+import { ForestPlotIntervalos, HeatmapIntervalos } from "@/graficos/echarts/IntervalosComparativos";
 import { ESCALA_RIESGO } from "@/graficos/echarts/motor";
 import { MapaCoropletas } from "@/graficos/echarts/MapaCoropletas";
 
@@ -65,6 +65,7 @@ export function IntervalosIntergenesicos() {
         <CategoriasIntervalos sql={sqlIntervalosCategorias(filtros)} />
         <MapaCoropletas
           titulo="Intervalos menores de 24 meses por departamento de ocurrencia"
+          ayuda="Porcentaje de intervalos menores de 24 meses en cada departamento donde ocurrió el nacimiento. El color compara departamentos; no hay desglose municipal."
           sql={sqlMapaIntervalos(filtros)}
           ignorarMunicipio
           soloDepartamentos
@@ -74,11 +75,11 @@ export function IntervalosIntergenesicos() {
           hechoEtiqueta="Intervalos"
         />
         <ResultadosIntervalos sql={sqlResultadosIntervalos(filtros)} />
-        <BoxplotIntervalos sql={sqlBoxplotIntervalos(filtros)} />
+        <ForestPlotIntervalos sql={sqlRiesgoRelativoIntervalos(filtros)} />
         <HeatmapIntervalos sql={sqlHeatmapIntervalos(filtros)} />
       </div>
       <p className="nota nota-pie">
-        * Calculado solo entre registros evaluables; los valores faltantes no se cuentan como resultados favorables. La mediana, los percentiles y el boxplot se estiman con intervalos agrupados al mes; los bigotes usan la regla de 1,5 rangos intercuartílicos. Las diferencias entre categorías son descriptivas.
+        * Calculado solo entre registros evaluables; los valores faltantes no se cuentan como resultados favorables. El forest plot compara cada categoría de intervalo con la óptima. Los IC del 95% usan la aproximación de Katz y, si alguna celda es cero, una corrección de 0,5. Las diferencias son descriptivas y no están ajustadas por otras variables.
       </p>
     </>
   );

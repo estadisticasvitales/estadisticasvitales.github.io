@@ -55,7 +55,12 @@ export function DistribucionIntervalos({ sql }) {
   }, [datos]);
 
   return (
-    <Tarjeta titulo="Distribución de los intervalos" cargando={cargando && datos.length === 0} error={error}>
+    <Tarjeta
+      titulo="Distribución de los intervalos"
+      ayuda="Cantidad de nacimientos según el intervalo en meses, agrupado en tramos de seis meses. La línea punteada marca los 24 meses."
+      cargando={cargando && datos.length === 0}
+      error={error}
+    >
       {datos.length === 0 && !cargando ? <Vacio>No hay datos para estos filtros.</Vacio> : <Grafico opcion={opcion} cargando={cargando} />}
     </Tarjeta>
   );
@@ -97,7 +102,12 @@ export function CategoriasIntervalos({ sql }) {
   }, [filas]);
 
   return (
-    <Tarjeta titulo="Composición por categoría" cargando={cargando && filas.length === 0} error={error}>
+    <Tarjeta
+      titulo="Composición por categoría"
+      ayuda="Porcentaje de intervalos que cae en cada categoría: corto, subóptimo, óptimo, largo o muy largo. Los porcentajes se calculan sobre los intervalos válidos que cumplen los filtros."
+      cargando={cargando && filas.length === 0}
+      error={error}
+    >
       {filas.length === 0 && !cargando ? <Vacio>No hay datos para estos filtros.</Vacio> : <Grafico opcion={opcion} cargando={cargando} />}
     </Tarjeta>
   );
@@ -157,7 +167,12 @@ export function ResultadosIntervalos({ sql }) {
   }, [filas]);
 
   return (
-    <Tarjeta titulo="Resultados del recién nacido por intervalo" cargando={cargando && filas.length === 0} error={error}>
+    <Tarjeta
+      titulo="Resultados del recién nacido por intervalo"
+      ayuda="Porcentaje de bajo peso, prematuridad, APGAR bajo y resultado compuesto adverso dentro de cada categoría de intervalo. Cada porcentaje usa solo los registros evaluables para ese resultado; los faltantes no entran en el denominador."
+      cargando={cargando && filas.length === 0}
+      error={error}
+    >
       {filas.length === 0 && !cargando ? <Vacio>No hay datos para estos filtros.</Vacio> : <Grafico opcion={opcion} cargando={cargando} />}
     </Tarjeta>
   );

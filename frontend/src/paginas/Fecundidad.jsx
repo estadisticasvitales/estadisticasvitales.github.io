@@ -88,6 +88,7 @@ export function Fecundidad() {
         <RankingTasas
           titulo="Territorios con mayor TGF"
           sql={sqlRankingTgf(filtros)}
+          ayuda="Muestra hasta diez territorios con mayor tasa global de fecundidad para el año y los filtros seleccionados. La unidad es hijos por mujer."
           color={COLORES_TEMA.mujeres}
           formato={decimal2}
           nombre="Hijos por mujer"
@@ -95,6 +96,7 @@ export function Fecundidad() {
         />
         <MapaCoropletas
           titulo="Tasa global de fecundidad (TGF)"
+          ayuda="Distribución territorial de la TGF para el año y los filtros seleccionados. Resume las tasas de fecundidad de mujeres de 15 a 49 años y se expresa en hijos por mujer."
           sql={sqlMapaTgf(filtros)}
           colores={ESCALA_TGF.colores}
           cortes={ESCALA_TGF.cortes}

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Tarjeta, Vacio } from "@/componentes/Tarjeta";
 import { useConsulta } from "@/datos/useConsulta";
 import { decimal, entero } from "@/estilos/tema";
@@ -19,110 +19,157 @@ const ORDEN_EDUCACION = [
   "Sin información",
 ];
 
-function cuantilaPonderada(filas, p) {
-  const total = filas.reduce((suma, fila) => suma + fila.registros, 0);
-  if (!total) return null;
-  const objetivo = total * p;
-  let acumulado = 0;
-  for (const fila of filas) {
-    acumulado += fila.registros;
-    if (acumulado >= objetivo) return fila.mes_bin + 0.5;
-  }
-  return filas.at(-1).mes_bin + 0.5;
-}
+const VARIABLES_BOOLEANAS = [
+  { clave: "n_bajo_peso", evaluable: "n_bajo_peso_evaluable", etiqueta: "Bajo peso al nacer" },
+  { clave: "n_prematuro", evaluable: "n_prematuro_evaluable", etiqueta: "Prematuridad" },
+  { clave: "n_apgar_bajo", evaluable: "n_apgar_bajo_evaluable", etiqueta: "APGAR bajo" },
+  { clave: "n_adverso", evaluable: "n_adverso_evaluable", etiqueta: "Resultado compuesto adverso" },
+];
 
-function prepararCajas(filas) {
-  const grupos = new Map();
-  for (const fila of filas) {
-    if (!grupos.has(fila.edad_madre_cat)) grupos.set(fila.edad_madre_cat, []);
-    grupos.get(fila.edad_madre_cat).push(fila);
-  }
+function calcularRiesgos(filas, variable) {
+  const grupos = filas
+    .map((fila) => ({
+      ...fila,
+      eventos: Number(fila[variable.clave]) || 0,
+      denominador: Number(fila[variable.evaluable]) || 0,
+      orden: Number.parseInt(fila.categoria_intervalo, 10) || 999,
+    }))
+    .filter((fila) => fila.denominador > 0)
+    .sort((a, b) => a.orden - b.orden || a.categoria_intervalo.localeCompare(b.categoria_intervalo, "es"));
+  const referencia = grupos.find((fila) => fila.categoria_intervalo.startsWith("3."));
+  if (!referencia || referencia.eventos > referencia.denominador) return [];
 
-  const edades = [...grupos.keys()].sort((a, b) => {
-    const edadA = Number.parseInt(a, 10);
-    const edadB = Number.parseInt(b, 10);
-    return (Number.isFinite(edadA) ? edadA : 999) - (Number.isFinite(edadB) ? edadB : 999);
-  });
-  const cajas = edades.map((edad) => {
-    const valores = grupos.get(edad).sort((a, b) => a.mes_bin - b.mes_bin);
-    const q1 = cuantilaPonderada(valores, 0.25);
-    const mediana = cuantilaPonderada(valores, 0.5);
-    const q3 = cuantilaPonderada(valores, 0.75);
-    const iqr = q3 - q1;
-    const cerca = valores
-      .map((fila) => ({ ...fila, mes: fila.mes_bin + 0.5 }))
-      .filter((fila) => fila.mes >= q1 - 1.5 * iqr && fila.mes <= q3 + 1.5 * iqr);
-    const bajos = cerca.length ? cerca[0].mes : q1;
-    const altos = cerca.length ? cerca.at(-1).mes : q3;
-    const n = valores.reduce((suma, fila) => suma + fila.registros, 0);
+  return grupos.map((fila) => {
+    const prevalencia = fila.eventos / fila.denominador;
+    if (fila === referencia) {
+      return { ...fila, prevalencia, rr: 1, inferior: 1, superior: 1, corregido: false };
+    }
+    if (fila.eventos > fila.denominador) {
+      return { ...fila, prevalencia, rr: null, inferior: null, superior: null, corregido: false };
+    }
+
+    let eventos = fila.eventos;
+    let noEventos = fila.denominador - fila.eventos;
+    let eventosRef = referencia.eventos;
+    let noEventosRef = referencia.denominador - referencia.eventos;
+    const corregido = [eventos, noEventos, eventosRef, noEventosRef].some((valor) => valor === 0);
+    if (corregido) {
+      eventos += 0.5;
+      noEventos += 0.5;
+      eventosRef += 0.5;
+      noEventosRef += 0.5;
+    }
+
+    const prevalenciaAjustada = eventos / (eventos + noEventos);
+    const prevalenciaRefAjustada = eventosRef / (eventosRef + noEventosRef);
+    const rr = prevalenciaAjustada / prevalenciaRefAjustada;
+    const error = Math.sqrt(
+      Math.max(0, 1 / eventos - 1 / (eventos + noEventos) + 1 / eventosRef - 1 / (eventosRef + noEventosRef)),
+    );
     return {
-      edad,
-      n,
-      q1,
-      mediana,
-      q3,
-      bajos,
-      altos,
-      caja: [bajos, q1, mediana, q3, altos],
-      atipicos: valores
-        .map((fila) => ({ edad, mes: fila.mes_bin + 0.5, registros: fila.registros }))
-        .filter((fila) => fila.mes < bajos || fila.mes > altos),
+      ...fila,
+      prevalencia,
+      rr,
+      inferior: Math.exp(Math.log(rr) - 1.96 * error),
+      superior: Math.exp(Math.log(rr) + 1.96 * error),
+      corregido,
     };
   });
-  return { edades, cajas };
 }
 
-export function BoxplotIntervalos({ sql }) {
+export function ForestPlotIntervalos({ sql }) {
+  const [variableClave, setVariableClave] = useState(VARIABLES_BOOLEANAS[3].clave);
   const { filas, cargando, error } = useConsulta(sql);
+  const variable = VARIABLES_BOOLEANAS.find((opcion) => opcion.clave === variableClave) ?? VARIABLES_BOOLEANAS[3];
   const opcion = useMemo(() => {
-    const { edades, cajas } = prepararCajas(filas);
-    const cajaPorEdad = new Map(cajas.map((caja) => [caja.edad, caja]));
-    const maximo = Math.max(12, ...cajas.map((caja) => caja.altos), ...cajas.flatMap((caja) => caja.atipicos.map((fila) => fila.mes)));
+    const riesgos = calcularRiesgos(filas, variable).filter((fila) => Number.isFinite(fila.rr));
+    const categorias = riesgos.map((fila) => fila.categoria_intervalo);
+    const maximo = Math.max(1.1, ...riesgos.map((fila) => fila.superior));
+    const minimo = Math.min(0.9, ...riesgos.map((fila) => fila.inferior));
+    const amplitud = maximo - minimo || 0.2;
+    const datos = riesgos.map((fila, indice) => ({
+      name: fila.categoria_intervalo,
+      value: [fila.rr, indice, fila.inferior, fila.superior],
+      itemStyle: { color: fila.orden === 3 ? COLORES_TEMA.tinta : COLORES_TEMA.nacimientos },
+    }));
+    const porCategoria = new Map(riesgos.map((fila) => [fila.categoria_intervalo, fila]));
+
     return {
       tooltip: tooltip(undefined, {
         trigger: "item",
         formatter: (parametro) => {
-          const caja = cajaPorEdad.get(String(parametro.name));
-          if (!caja) return "";
+          const fila = porCategoria.get(String(parametro.name));
+          if (!fila) return "Sin estimación disponible";
           return [
-            `<strong>${caja.edad}</strong>`,
-            `Mediana: ${decimal(caja.mediana)} meses`,
-            `P25–P75: ${decimal(caja.q1)}–${decimal(caja.q3)} meses`,
-            `Bigotes: ${decimal(caja.bajos)}–${decimal(caja.altos)} meses`,
-            `Intervalos: ${entero(caja.n)}`,
+            `<strong>${fila.categoria_intervalo}</strong>`,
+            `Prevalencia: ${decimal(100 * fila.prevalencia)}% (${entero(fila.eventos)} de ${entero(fila.denominador)})`,
+            `RR vs. óptimo: ${fila.rr === 1 ? "1,000" : decimal(fila.rr)} [${decimal(fila.inferior)}, ${decimal(fila.superior)}]`,
+            fila.corregido ? "IC con corrección de 0,5 por conteo nulo" : "IC aproximado del 95% (Katz)",
           ].join("<br/>");
         },
       }),
-      grid: { top: 18, right: 18, bottom: 36, left: 58 },
-      xAxis: ejeCategoria(edades),
-      yAxis: ejeValor(maximo, { name: "Meses", nameTextStyle: TEXTO }),
+      grid: { top: 18, right: 24, bottom: 46, left: 118 },
+      xAxis: ejeValor(maximo + amplitud * 0.08, {
+        min: Math.max(0, minimo - amplitud * 0.08),
+        max: maximo + amplitud * 0.08,
+        name: "Riesgo relativo (escala lineal)",
+        nameLocation: "middle",
+        nameGap: 30,
+        nameTextStyle: TEXTO,
+        axisLabel: { ...TEXTO, fontSize: 11, formatter: (valor) => decimal(valor) },
+      }),
+      yAxis: ejeCategoria(categorias, { inverse: true, axisLabel: { width: 108, overflow: "truncate" } }),
       series: [
         {
-          id: "boxplot-intervalos",
-          name: "Intervalo (meses)",
-          type: "boxplot",
-          data: cajas.map((caja) => ({ name: caja.edad, value: caja.caja })),
-          itemStyle: { color: "rgba(46, 199, 201, 0.45)", borderColor: COLORES_TEMA.nacimientos },
-          emphasis: { itemStyle: { borderWidth: 2 } },
-        },
-        {
-          id: "atipicos-intervalos",
-          name: "Valores atípicos",
-          type: "scatter",
-          silent: true,
-          data: cajas.flatMap((caja) => caja.atipicos.map((fila) => [fila.edad, fila.mes, fila.registros])),
-          symbolSize: (valor) => Math.min(9, 3 + Math.log2(Number(valor[2]) || 1)),
-          itemStyle: { color: COLORES_TEMA.gris, opacity: 0.5 },
-          dimensions: ["edad", "meses", "registros"],
-          encode: { x: "edad", y: "meses" },
+          id: "rr-intervalos",
+          name: "RR e IC 95%",
+          type: "custom",
+          data: datos,
+          renderItem: (params, api) => {
+            const punto = api.coord([api.value(0), api.value(1)]);
+            const bajo = api.coord([api.value(2), api.value(1)]);
+            const alto = api.coord([api.value(3), api.value(1)]);
+            const color = api.visual("color");
+            const altoTapa = 5;
+            return {
+              type: "group",
+              children: [
+                { type: "line", shape: { x1: bajo[0], y1: punto[1], x2: alto[0], y2: punto[1] }, style: { stroke: color, lineWidth: 2 } },
+                { type: "line", shape: { x1: bajo[0], y1: punto[1] - altoTapa, x2: bajo[0], y2: punto[1] + altoTapa }, style: { stroke: color, lineWidth: 2 } },
+                { type: "line", shape: { x1: alto[0], y1: punto[1] - altoTapa, x2: alto[0], y2: punto[1] + altoTapa }, style: { stroke: color, lineWidth: 2 } },
+                { type: "circle", shape: { cx: punto[0], cy: punto[1], r: 5 }, style: { fill: color, stroke: "#fff", lineWidth: 1.5 } },
+              ],
+            };
+          },
+          encode: { x: 0, y: 1 },
+          markLine: {
+            symbol: "none",
+            silent: true,
+            lineStyle: { color: COLORES_TEMA.tinta, type: "dashed", width: 1 },
+            label: { show: true, formatter: "RR = 1", position: "insideEndTop", ...TEXTO, fontSize: 10 },
+            data: [{ xAxis: 1 }],
+          },
+          emphasis: { focus: "self" },
         },
       ],
     };
-  }, [filas]);
+  }, [filas, variable]);
 
+  const riesgosDisponibles = calcularRiesgos(filas, variable).some((fila) => Number.isFinite(fila.rr));
   return (
-    <Tarjeta titulo="Distribución del intervalo por edad materna" cargando={cargando && filas.length === 0} error={error}>
-      {filas.length === 0 && !cargando ? <Vacio>No hay datos para estos filtros.</Vacio> : <Grafico opcion={opcion} cargando={cargando} />}
+    <Tarjeta
+      titulo={`Prevalencia de ${variable.etiqueta.toLowerCase()} por intervalo`}
+      ayuda="El punto muestra la prevalencia del resultado elegido en cada categoría de intervalo frente a la categoría óptima (referencia). RR = 1 indica la misma prevalencia; RR = 1,5 indica una prevalencia 50% mayor; RR = 0,8, una 20% menor. Las barras son IC aproximados del 95%: si cruzan 1, los datos son compatibles con una prevalencia similar a la referencia. Son comparaciones descriptivas, no ajustadas; con celdas de cero casos se aplica una corrección de 0,5."
+      cargando={cargando && filas.length === 0}
+      error={error}
+    >
+      <label className="selector-grafico">
+        <span>Resultado</span>
+        <select value={variableClave} onChange={(evento) => setVariableClave(evento.target.value)}>
+          {VARIABLES_BOOLEANAS.map((opcion) => <option key={opcion.clave} value={opcion.clave}>{opcion.etiqueta}</option>)}
+        </select>
+      </label>
+      {!cargando && !riesgosDisponibles ? <Vacio>No hay datos evaluables o no está disponible la categoría de referencia óptima.</Vacio> : <Grafico opcion={opcion} cargando={cargando} />}
     </Tarjeta>
   );
 }
@@ -210,7 +257,12 @@ export function HeatmapIntervalos({ sql }) {
   }, [filas]);
 
   return (
-    <Tarjeta titulo="Intervalos menores de 24 meses por edad y educación" cargando={cargando && filas.length === 0} error={error}>
+    <Tarjeta
+      titulo="Intervalos menores de 24 meses por edad y educación"
+      ayuda="Porcentaje de intervalos menores de 24 meses en cada combinación de grupo de edad y nivel educativo de la madre. El color representa el porcentaje y la escala llega al máximo observado con los filtros actuales."
+      cargando={cargando && filas.length === 0}
+      error={error}
+    >
       {filas.length === 0 && !cargando ? <Vacio>No hay datos para estos filtros.</Vacio> : <Grafico opcion={opcion} cargando={cargando} />}
     </Tarjeta>
   );

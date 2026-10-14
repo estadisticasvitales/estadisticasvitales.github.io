@@ -98,15 +98,21 @@ export function sqlIntervalosCategorias(filtros) {
   `;
 }
 
-export function sqlBoxplotIntervalos(filtros) {
+export function sqlRiesgoRelativoIntervalos(filtros) {
   return `
-    SELECT edad_madre_cat,
-           mes_bin,
-           SUM(registros)::DOUBLE AS registros
+    SELECT categoria_intervalo,
+           SUM(n_bajo_peso_evaluable)::DOUBLE AS n_bajo_peso_evaluable,
+           SUM(n_bajo_peso)::DOUBLE AS n_bajo_peso,
+           SUM(n_prematuro_evaluable)::DOUBLE AS n_prematuro_evaluable,
+           SUM(n_prematuro)::DOUBLE AS n_prematuro,
+           SUM(n_apgar_bajo_evaluable)::DOUBLE AS n_apgar_bajo_evaluable,
+           SUM(n_apgar_bajo)::DOUBLE AS n_apgar_bajo,
+           SUM(n_adverso_evaluable)::DOUBLE AS n_adverso_evaluable,
+           SUM(n_adverso)::DOUBLE AS n_adverso
     FROM intervalos
     WHERE ${whereIntervalos(filtros)}
-    GROUP BY 1, 2
-    ORDER BY 1, 2
+    GROUP BY 1
+    ORDER BY categoria_intervalo
   `;
 }
 

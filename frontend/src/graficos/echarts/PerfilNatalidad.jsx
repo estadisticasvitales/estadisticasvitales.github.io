@@ -80,7 +80,12 @@ export function PerfilNatalidad({
   );
 
   return (
-    <Tarjeta titulo={titulo} cargando={cargando && datos.length === 0} error={error}>
+    <Tarjeta
+      titulo={titulo}
+      ayuda={`Compara ${anioActual} vs ${anioBase}. ${anioBase} es el primer año con información disponible.`}
+      cargando={cargando && datos.length === 0}
+      error={error}
+    >
       {datos.length === 0 && !cargando ? (
         <Vacio>No hay desagregación para este filtro.</Vacio>
       ) : (

@@ -65,6 +65,7 @@ export function SerieTgf({ sql }) {
   return (
     <Tarjeta
       titulo="Tasa global de fecundidad (hijos por mujer)"
+      ayuda="Número promedio de hijos por mujer que resultaría si se mantuvieran las tasas específicas por edad de ese año. En un territorio seleccionado, la línea local se compara con la nacional."
       cargando={cargando && filas.length === 0}
       error={error}
     >

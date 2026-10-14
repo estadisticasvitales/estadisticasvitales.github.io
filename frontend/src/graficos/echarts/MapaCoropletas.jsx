@@ -54,6 +54,7 @@ function claseDe(valor, cortes) {
 
 export function MapaCoropletas({
   titulo,
+  ayuda,
   sql,
   municipal = false,
   ignorarMunicipio = false,
@@ -121,7 +122,7 @@ export function MapaCoropletas({
   const listo = !cargando && Boolean(coleccion) && !fallo;
 
   return (
-    <Tarjeta titulo={titulo} cargando={!listo && !fallo} error={fallo}>
+    <Tarjeta titulo={titulo} ayuda={ayuda} cargando={!listo && !fallo} error={fallo}>
       {listo && coleccion.features.length === 0 ? <Vacio>No hay geometría para este territorio.</Vacio> : null}
       {listo && opcion ? (
         <div className="marco-mapa">

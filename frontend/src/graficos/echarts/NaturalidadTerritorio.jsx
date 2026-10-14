@@ -112,6 +112,7 @@ export function NaturalidadTerritorio() {
   return (
     <Tarjeta
       titulo="Muertes naturales y no naturales por entidad territorial"
+      ayuda="Muestra la proporción y el número de defunciones naturales y no naturales en cada territorio. En esta clasificación, las causas no naturales corresponden a códigos de causa que comienzan por 5; las naturales son el resto de las causas registradas."
       cargando={cargando && datos.length === 0}
       error={error}
     >

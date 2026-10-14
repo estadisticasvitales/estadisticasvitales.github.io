@@ -56,6 +56,7 @@ export function BarrasFecundidad({ sql, anioBase, anioActual }) {
   return (
     <Tarjeta
       titulo="Fecundidad por edad de la madre (hijos por cada 1.000 mujeres)"
+      ayuda={`Cantidad de nacidos vivos por cada 1.000 mujeres de cada grupo de edad. Compara ${anioActual} vs ${anioBase}, el primer año con información disponible.`}
       cargando={cargando && datos.length === 0}
       error={error}
     >

@@ -14,7 +14,7 @@ function clave(texto) {
     .toLowerCase();
 }
 
-export function PiramideTasas({ sql }) {
+export function PiramideTasas({ sql, ayuda }) {
   const { filas, cargando, error } = useConsulta(sql);
 
   const datos = useMemo(() => {
@@ -44,6 +44,7 @@ export function PiramideTasas({ sql }) {
   return (
     <Tarjeta
       titulo="Mortalidad por edad y sexo (por 1.000)"
+      ayuda={ayuda}
       cargando={cargando && filas.length === 0}
       error={error}
     >
