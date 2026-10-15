@@ -23,7 +23,7 @@ export function BarraLateral({ pagina }) {
     useConsulta(consultaCausas);
 
   const anios = useMemo(
-    () => (pagina === "intervalos" ? catalogos.aniosIntervalos : catalogos.anios)
+    () => (pagina === "intervalos" ? catalogos.aniosIntervalos : pagina === "flujos" ? [2025] : catalogos.anios)
       .map((anio) => ({ valor: String(anio), etiqueta: String(anio) })),
     [catalogos.anios, catalogos.aniosIntervalos, pagina],
   );
@@ -73,9 +73,13 @@ export function BarraLateral({ pagina }) {
     }
   }, [actualizar, catalogos.aniosIntervalos, filtros.anio, pagina]);
 
+  useEffect(() => {
+    if (pagina === "flujos" && filtros.anio !== "2025") actualizar("anio", "2025");
+  }, [actualizar, filtros.anio, pagina]);
+
   const hayFiltros =
     filtros.departamento !== "Todos" ||
-    (pagina !== "intervalos" && filtros.municipio !== "Todos") ||
+    (pagina !== "intervalos" && pagina !== "flujos" && filtros.municipio !== "Todos") ||
     (pagina === "causas" && filtros.causa !== "Todas") ||
     (pagina === "externas" && filtros.externa !== "Todas") ||
     (pagina === "intervalos" &&
@@ -115,7 +119,7 @@ export function BarraLateral({ pagina }) {
         opciones={departamentos}
         alElegir={(siguiente) => actualizar("departamento", siguiente)}
       />
-      {pagina !== "intervalos" ? (
+      {pagina !== "intervalos" && pagina !== "flujos" ? (
         <Buscador
           etiqueta="Municipio"
           valor={filtros.municipio}

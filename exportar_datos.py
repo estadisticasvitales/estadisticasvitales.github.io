@@ -73,6 +73,7 @@ def main() -> None:
     SALIDA.mkdir(exist_ok=True)
     tablero = db.cargar_tablero()
     extra = analisis.cargar_analisis()
+    flujos = analisis.cargar_flujos_nacimientos()
     archivos = {
         "panorama.parquet": panorama(tablero["nacimientos"], tablero["defunciones"]),
         "causas.parquet": causas(tablero["causas"]),
@@ -98,6 +99,7 @@ def main() -> None:
                 "n_adverso",
             ),
         ),
+        "flujos_nacimientos.parquet": recorte(flujos, ("nacimientos",)),
     }
     for nombre, tabla in archivos.items():
         ruta = escribir(tabla, nombre)

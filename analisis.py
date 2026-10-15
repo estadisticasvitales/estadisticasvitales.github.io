@@ -365,3 +365,62 @@ def cargar_analisis() -> dict:
         "intervalos": intervalos,
     }
     return _ANALISIS
+
+
+def cargar_flujos_nacimientos() -> pd.DataFrame:
+    """Lee los flujos residencia-ocurrencia agregados de la vista materializada."""
+    conn = db.conectar()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '90s'")
+        return db._consultar(
+            conn,
+            """
+            WITH ocurrencia AS (
+                SELECT ano AS anio, cod_dpto AS codigo,
+                       COUNT(*)::bigint AS nacimientos_ocurrencia
+                FROM nacimientos.fact_nac_2025
+                WHERE ano = 2025 AND cod_dpto IS NOT NULL
+                GROUP BY ano, cod_dpto
+            ),
+            residencia AS (
+                SELECT ano AS anio, codptore AS codigo,
+                       COUNT(*)::bigint AS nacimientos_residencia,
+                       COUNT(*) FILTER (WHERE cod_dpto <> codptore)::bigint AS nacimientos_fuera_residencia
+                FROM nacimientos.fact_nac_2025
+                WHERE ano = 2025 AND codptore IS NOT NULL
+                GROUP BY ano, codptore
+            )
+            SELECT b.anio,
+                   b.cod_ocurrencia,
+                   MAX(g_ocu.departamento) AS departamento_ocurrencia,
+                   b.cod_residencia,
+                   MAX(g_res.departamento) AS departamento_residencia,
+                   SUM(b.nacimientos)::bigint AS nacimientos,
+                   MAX(o.nacimientos_ocurrencia)::bigint AS nacimientos_ocurrencia,
+                   MAX(r.nacimientos_residencia)::bigint AS nacimientos_residencia,
+                   MAX(r.nacimientos_fuera_residencia)::bigint AS nacimientos_fuera_residencia
+            FROM nacimientos.mv_flujos_nacimientos b
+            LEFT JOIN ocurrencia o
+              ON o.anio = b.anio AND o.codigo = b.cod_ocurrencia
+            LEFT JOIN residencia r
+              ON r.anio = b.anio AND r.codigo = b.cod_residencia
+            LEFT JOIN (
+                SELECT cod_departamento, MAX(departamento) AS departamento
+                FROM geografia.dim_geografia
+                WHERE cod_departamento IS NOT NULL
+                GROUP BY cod_departamento
+            ) g_ocu ON g_ocu.cod_departamento = b.cod_ocurrencia
+            LEFT JOIN (
+                SELECT cod_departamento, MAX(departamento) AS departamento
+                FROM geografia.dim_geografia
+                WHERE cod_departamento IS NOT NULL
+                GROUP BY cod_departamento
+            ) g_res ON g_res.cod_departamento = b.cod_residencia
+            WHERE b.anio = 2025
+            GROUP BY b.anio, b.cod_ocurrencia, b.cod_residencia
+            """,
+            (),
+        )
+    finally:
+        conn.close()
