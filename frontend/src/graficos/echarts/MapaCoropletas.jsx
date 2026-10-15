@@ -61,6 +61,7 @@ export function MapaCoropletas({
   soloDepartamentos = false,
   colores,
   cortes,
+  divergente = false,
   formato = decimal,
   unidad = "",
   hechoEtiqueta = "Hechos",
@@ -78,13 +79,17 @@ export function MapaCoropletas({
 
   const escala = useMemo(() => {
     const valores = filas.map((fila) => fila.valor).filter((valor) => Number.isFinite(valor));
-    const limites = cortes ?? (valores.length ? cuantiles(valores, colores.length) : []);
-    const paleta =
-      cortes || limites.length + 1 === colores.length
+    const maximoAbsoluto = Math.max(0, ...valores.map((valor) => Math.abs(valor)));
+    const limites = cortes ?? (divergente && maximoAbsoluto
+      ? [-maximoAbsoluto * 0.4, -maximoAbsoluto * 0.025, maximoAbsoluto * 0.025, maximoAbsoluto * 0.4]
+      : valores.length ? cuantiles(valores, colores.length) : []);
+    const paleta = divergente
+      ? colores
+      : cortes || limites.length + 1 === colores.length
         ? colores
         : colores.slice(colores.length - limites.length - 1);
     return { cortes: limites, colores: paleta, rangos: rangos(limites, paleta, formato) };
-  }, [colores, cortes, filas, formato]);
+  }, [colores, cortes, divergente, filas, formato]);
 
   const opcion = useMemo(() => {
     if (!coleccion || coleccion.features.length === 0) return null;
