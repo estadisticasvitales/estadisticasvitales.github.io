@@ -5,6 +5,10 @@ const ARCHIVOS = [
   "poblacion.parquet",
   "poblacion_area.parquet",
   "nac_edad.parquet",
+  "nac_padres.parquet",
+  "caracterizacion.parquet",
+  "estado_conyugal.parquet",
+  "estado_civil.parquet",
   "nac_perfil.parquet",
   "def_edad.parquet",
   "externas.parquet",
@@ -44,6 +48,10 @@ async function iniciar() {
     CREATE TABLE poblacion AS SELECT * FROM read_parquet('poblacion.parquet');
     CREATE TABLE poblacion_area AS SELECT * FROM read_parquet('poblacion_area.parquet');
     CREATE TABLE nac_edad AS SELECT * FROM read_parquet('nac_edad.parquet');
+    CREATE TABLE nac_padres AS SELECT * FROM read_parquet('nac_padres.parquet');
+    CREATE TABLE caracterizacion AS SELECT * FROM read_parquet('caracterizacion.parquet');
+    CREATE TABLE estado_conyugal AS SELECT * FROM read_parquet('estado_conyugal.parquet');
+    CREATE TABLE estado_civil AS SELECT * FROM read_parquet('estado_civil.parquet');
     CREATE TABLE nac_perfil AS SELECT * FROM read_parquet('nac_perfil.parquet');
     CREATE TABLE def_edad AS SELECT * FROM read_parquet('def_edad.parquet');
     CREATE TABLE externas AS SELECT * FROM read_parquet('externas.parquet');

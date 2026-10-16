@@ -81,6 +81,14 @@ def main() -> None:
         "poblacion.parquet": recorte(extra["poblacion"], ("poblacion",)),
         "poblacion_area.parquet": recorte(extra["poblacion_area"], ("poblacion",)),
         "nac_edad.parquet": recorte(extra["nac_edad"], ("nacimientos",)),
+        "nac_padres.parquet": recorte(extra["nac_padres"], ("nacimientos",)),
+        "caracterizacion.parquet": recorte(extra["caracterizacion"], ("nacimientos",)),
+        "estado_conyugal.parquet": recorte(
+            extra["estado_conyugal"], ("nacimientos", "orden_estado_civil")
+        ),
+        "estado_civil.parquet": recorte(
+            extra["estado_civil"], ("nacimientos", "orden_estado_civil")
+        ),
         "nac_perfil.parquet": recorte(extra["nac_perfil"], ("nacimientos",)),
         "def_edad.parquet": recorte(extra["def_edad"], ("defunciones",)),
         "externas.parquet": recorte(extra["externas"], ("defunciones",)),

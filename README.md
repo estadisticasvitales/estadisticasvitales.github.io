@@ -4,7 +4,7 @@ Dashboard estático de nacimientos y defunciones en Colombia a partir de las est
 
 Sitio publicado: [https://estadisticasvitales.github.io/](https://estadisticasvitales.github.io/)
 
-## ¿Qué muestra=
+## ¿Qué muestra?
 
 - **Panorama:** conteos, tasas brutas por 1.000 habitantes, relación nacimientos-defunciones, mapa y rankings.
 - **Nacimientos:** fecundidad por edad, tasa global y fecundidad adolescente (Fecundidad), caída de la natalidad desde 2019 por edad, educación y régimen (Natalidad), intervalos intergenésicos por departamento de ocurrencia y perfil materno, y flujos obstétricos entre residencia y ocurrencia (2025), con mapas de dependencia y saldo, rutas, ranking de receptores, heatmap y dispersión de atracción/expulsión.

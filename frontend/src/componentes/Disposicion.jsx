@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { Component, useMemo, useState } from "react";
 import { BarraLateral } from "@/componentes/BarraLateral";
 import { CaidaNatalidad } from "@/paginas/CaidaNatalidad";
+import { CaracteristicasPadres } from "@/paginas/CaracteristicasPadres";
 import { CausasExternas } from "@/paginas/CausasExternas";
 import { Defunciones } from "@/paginas/Defunciones";
 import { Fecundidad } from "@/paginas/Fecundidad";
@@ -23,6 +24,7 @@ const MENU = [
       { id: "fecundidad", titulo: "Fecundidad" },
       { id: "intervalos", titulo: "Intervalos Intergenésicos" },
       { id: "flujos", titulo: "Flujos obstétricos" },
+      { id: "padres", titulo: "Caracterización" },
     ],
   },
   {
@@ -41,6 +43,7 @@ const PAGINAS = {
   fecundidad: Fecundidad,
   intervalos: IntervalosIntergenesicos,
   flujos: FlujosObstetricos,
+  padres: CaracteristicasPadres,
   caida: CaidaNatalidad,
   causas: Defunciones,
   mortalidad: Mortalidad,
@@ -49,6 +52,21 @@ const PAGINAS = {
 
 function seccionDe(pagina) {
   return MENU.find((item) => item.id === pagina || item.hijos?.some((hijo) => hijo.id === pagina));
+}
+
+class ErrorVista extends Component {
+  state = { error: null };
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return <p className="aviso error">No se pudo mostrar esta página: {this.state.error.message}</p>;
+    }
+    return this.props.children;
+  }
 }
 
 export function Disposicion() {
@@ -104,7 +122,7 @@ export function Disposicion() {
       ) : null}
       <BarraLateral pagina={pagina} />
       <main className="contenido">
-        <Vista />
+        <ErrorVista key={pagina}><Vista /></ErrorVista>
       </main>
     </div>
   );
