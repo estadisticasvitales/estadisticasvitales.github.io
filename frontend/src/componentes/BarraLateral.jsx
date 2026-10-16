@@ -23,7 +23,7 @@ export function BarraLateral({ pagina }) {
     useConsulta(consultaCausas);
 
   const anios = useMemo(
-    () => (pagina === "intervalos" ? catalogos.aniosIntervalos : pagina === "flujos" ? [2025] : catalogos.anios)
+    () => (pagina === "intervalos" ? catalogos.aniosIntervalos : pagina === "flujos" || pagina === "padres" ? [2025] : catalogos.anios)
       .map((anio) => ({ valor: String(anio), etiqueta: String(anio) })),
     [catalogos.anios, catalogos.aniosIntervalos, pagina],
   );
@@ -75,6 +75,10 @@ export function BarraLateral({ pagina }) {
 
   useEffect(() => {
     if (pagina === "flujos" && filtros.anio !== "2025") actualizar("anio", "2025");
+  }, [actualizar, filtros.anio, pagina]);
+
+  useEffect(() => {
+    if (pagina === "padres" && filtros.anio !== "2025") actualizar("anio", "2025");
   }, [actualizar, filtros.anio, pagina]);
 
   const hayFiltros =

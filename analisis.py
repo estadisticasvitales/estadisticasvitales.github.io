@@ -154,6 +154,52 @@ def cargar_intervalos(conn) -> pd.DataFrame:
     )
 
 
+def cargar_caracterizacion(conn) -> pd.DataFrame:
+    """Cortes agregados para los gráficos adicionales de Caracterización."""
+    return db._consultar(
+        conn,
+        """
+        WITH base AS (
+          SELECT f.ano::integer AS anio,
+                 LPAD(TRIM(f.cod_dpto::text), 2, '0') AS cod_departamento,
+                 g.departamento,
+                 LPAD(TRIM(f.cod_dpto::text), 2, '0') || LPAD(TRIM(f.cod_munic::text), 3, '0') AS cod_municipio,
+                 g.municipio,
+                 CASE f.mul_parto WHEN '1' THEN 'Simple' WHEN '2' THEN 'Doble' WHEN '3' THEN 'Trillizos' WHEN '4' THEN 'Cuatrillizos o más' ELSE 'Sin información' END AS multiplicidad,
+                 CASE f.idhemoclas WHEN '1' THEN 'A' WHEN '2' THEN 'B' WHEN '3' THEN 'O' WHEN '4' THEN 'AB' ELSE 'Sin información' END AS grupo_sanguineo,
+                 CASE f.idfactorrh WHEN '1' THEN 'Positivo' WHEN '2' THEN 'Negativo' ELSE 'Sin información' END AS factor_rh,
+                 CASE WHEN f.n_emb ~ '^[0-9]+$' AND f.n_emb::integer BETWEEN 1 AND 98 THEN f.n_emb::integer END AS embarazos,
+                 CASE WHEN f.n_hijosv ~ '^[0-9]+$' AND f.n_hijosv::integer BETWEEN 1 AND 98 THEN f.n_hijosv::integer END AS hijos_vivos,
+                 CASE WHEN f.numconsul ~ '^[0-9]+$' AND f.numconsul::integer BETWEEN 0 AND 98 THEN f.numconsul::integer END AS consultas,
+                 CASE f.edad_madre WHEN '1' THEN '10-14 años' WHEN '2' THEN '15-19 años' WHEN '3' THEN '20-24 años' WHEN '4' THEN '25-29 años' WHEN '5' THEN '30-34 años' WHEN '6' THEN '35-39 años' WHEN '7' THEN '40-44 años' WHEN '8' THEN '45-49 años' WHEN '9' THEN '50-54 años' END AS edad_madre,
+                 CASE WHEN f.n_emb ~ '^[0-9]+$' AND f.n_emb::integer BETWEEN 1 AND 98 THEN CASE WHEN f.n_emb::integer >= 5 THEN '5 o más' ELSE f.n_emb::integer::text END END AS grupo_embarazos,
+                 CASE WHEN f.n_hijosv ~ '^[0-9]+$' AND f.n_hijosv::integer BETWEEN 1 AND 98 THEN CASE WHEN f.n_hijosv::integer >= 5 THEN '5 o más' ELSE f.n_hijosv::integer::text END END AS grupo_hijos,
+                 CASE WHEN f.numconsul ~ '^[0-9]+$' AND f.numconsul::integer BETWEEN 0 AND 98 THEN CASE WHEN f.numconsul::integer = 0 THEN '0' WHEN f.numconsul::integer <= 3 THEN '1-3' WHEN f.numconsul::integer <= 6 THEN '4-6' WHEN f.numconsul::integer <= 9 THEN '7-9' ELSE '10 o más' END ELSE 'Sin información' END AS grupo_consultas
+          FROM nacimientos.fact_nac_2025 f
+          JOIN geografia.dim_geografia g
+            ON TRIM(g.cod_departamento::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0')
+           AND TRIM(g.cod_municipio::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0') || LPAD(TRIM(f.cod_munic::text), 3, '0')
+        )
+        SELECT anio, cod_departamento, departamento, cod_municipio, municipio,
+               'multiplicidad'::text AS dimension, multiplicidad AS categoria, ''::text AS subcategoria, COUNT(*)::bigint AS nacimientos
+        FROM base GROUP BY 1,2,3,4,5,6,7,8
+        UNION ALL
+        SELECT anio, cod_departamento, departamento, cod_municipio, municipio,
+               'hemoclasificacion', grupo_sanguineo, factor_rh, COUNT(*)::bigint
+        FROM base GROUP BY 1,2,3,4,5,6,7,8
+        UNION ALL
+        SELECT anio, cod_departamento, departamento, cod_municipio, municipio,
+               'historia_reproductiva', grupo_embarazos, grupo_hijos, COUNT(*)::bigint
+        FROM base WHERE grupo_embarazos IS NOT NULL AND grupo_hijos IS NOT NULL GROUP BY 1,2,3,4,5,6,7,8
+        UNION ALL
+        SELECT anio, cod_departamento, departamento, cod_municipio, municipio,
+               'controles_prenatales', edad_madre, grupo_consultas, COUNT(*)::bigint
+        FROM base WHERE edad_madre IS NOT NULL GROUP BY 1,2,3,4,5,6,7,8
+        """,
+        (),
+    )
+
+
 def cargar_analisis() -> dict:
     global _ANALISIS
     if _ANALISIS is not None:
@@ -215,6 +261,81 @@ def cargar_analisis() -> dict:
             FROM nacimientos.fact_nac_edad_madre f
             {db.CRUCE_GEOGRAFIA}
             GROUP BY 1, 2, 3, 4, 5, 6
+            """,
+            (),
+        )
+        nac_padres = db._consultar(
+            conn,
+            """
+            WITH base AS (
+                SELECT f.ano::integer AS anio,
+                       LPAD(TRIM(f.cod_dpto::text), 2, '0') AS cod_departamento,
+                       g.departamento,
+                       LPAD(TRIM(f.cod_dpto::text), 2, '0') || LPAD(TRIM(f.cod_munic::text), 3, '0') AS cod_municipio,
+                       g.municipio,
+                       CASE
+                           WHEN f.edad_padre = '999' THEN 'Sin información'
+                           WHEN f.edad_padre ~ '^[0-9]+$' AND f.edad_padre::integer BETWEEN 10 AND 14 THEN '10-14 años'
+                           WHEN f.edad_padre ~ '^[0-9]+$' AND f.edad_padre::integer BETWEEN 15 AND 19 THEN '15-19 años'
+                           WHEN f.edad_padre ~ '^[0-9]+$' AND f.edad_padre::integer BETWEEN 20 AND 24 THEN '20-24 años'
+                           WHEN f.edad_padre ~ '^[0-9]+$' AND f.edad_padre::integer BETWEEN 25 AND 29 THEN '25-29 años'
+                           WHEN f.edad_padre ~ '^[0-9]+$' AND f.edad_padre::integer BETWEEN 30 AND 34 THEN '30-34 años'
+                           WHEN f.edad_padre ~ '^[0-9]+$' AND f.edad_padre::integer BETWEEN 35 AND 39 THEN '35-39 años'
+                           WHEN f.edad_padre ~ '^[0-9]+$' AND f.edad_padre::integer BETWEEN 40 AND 44 THEN '40-44 años'
+                           WHEN f.edad_padre ~ '^[0-9]+$' AND f.edad_padre::integer BETWEEN 45 AND 49 THEN '45-49 años'
+                           WHEN f.edad_padre ~ '^[0-9]+$' AND f.edad_padre::integer BETWEEN 50 AND 54 THEN '50-54 años'
+                           WHEN f.edad_padre ~ '^[0-9]+$' AND f.edad_padre::integer >= 55 THEN '55+ años'
+                           ELSE 'No clasificado'
+                       END AS edad_padre_grupo,
+                       CASE f.edad_madre
+                           WHEN '1' THEN '10-14 años' WHEN '2' THEN '15-19 años'
+                           WHEN '3' THEN '20-24 años' WHEN '4' THEN '25-29 años'
+                           WHEN '5' THEN '30-34 años' WHEN '6' THEN '35-39 años'
+                           WHEN '7' THEN '40-44 años' WHEN '8' THEN '45-49 años'
+                           WHEN '9' THEN '50-54 años' WHEN '99' THEN 'Sin información'
+                           ELSE 'No clasificado'
+                       END AS edad_madre_grupo
+                FROM nacimientos.fact_nac_2025 f
+                LEFT JOIN geografia.dim_geografia g
+                  ON TRIM(g.cod_departamento::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0')
+                 AND TRIM(g.cod_municipio::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0') || LPAD(TRIM(f.cod_munic::text), 3, '0')
+            )
+            SELECT anio, cod_departamento, departamento, cod_municipio, municipio,
+                   edad_padre_grupo, edad_madre_grupo, COUNT(*)::bigint AS nacimientos
+            FROM base
+            WHERE edad_padre_grupo <> 'Sin información'
+              AND edad_madre_grupo <> 'Sin información'
+            GROUP BY 1, 2, 3, 4, 5, 6, 7
+            """,
+            (),
+        )
+        estado_conyugal = db._consultar(
+            conn,
+            """
+            SELECT anio,
+                   LPAD(TRIM(cod_departamento::text), 2, '0') AS cod_departamento,
+                   LPAD(TRIM(cod_departamento::text), 2, '0')
+                     || LPAD(TRIM(cod_municipio_dane::text), 3, '0') AS cod_municipio,
+                   departamento, municipio, estado_civil, orden_estado_civil,
+                   SUM(nacimientos)::bigint AS nacimientos
+            FROM nacimientos.mv_estado_conyugal_madre
+            GROUP BY anio, cod_departamento, cod_municipio_dane, departamento,
+                     municipio, estado_civil, orden_estado_civil
+            """,
+            (),
+        )
+        estado_civil = db._consultar(
+            conn,
+            """
+            SELECT anio,
+                   LPAD(TRIM(cod_departamento::text), 2, '0') AS cod_departamento,
+                   LPAD(TRIM(cod_departamento::text), 2, '0')
+                     || LPAD(TRIM(cod_municipio_dane::text), 3, '0') AS cod_municipio,
+                   departamento, municipio, estado_civil, orden_estado_civil,
+                   SUM(nacimientos)::bigint AS nacimientos
+            FROM nacimientos.mv_estado_civil_madre
+            GROUP BY anio, cod_departamento, cod_municipio_dane, departamento,
+                     municipio, estado_civil, orden_estado_civil
             """,
             (),
         )
@@ -293,6 +414,7 @@ def cargar_analisis() -> dict:
             (),
         )
         intervalos = cargar_intervalos(conn)
+        caracterizacion = cargar_caracterizacion(conn)
     finally:
         conn.close()
 
@@ -302,20 +424,28 @@ def cargar_analisis() -> dict:
         "cod_municipio",
         "municipio",
     )
-    for frame in (poblacion, poblacion_area, nac_edad, nac_perfil, def_edad, externas, intervalos):
+    for frame in (poblacion, poblacion_area, nac_edad, nac_padres, estado_conyugal, estado_civil, nac_perfil, def_edad, externas, intervalos, caracterizacion):
         db._enteros(frame, ("anio",))
         _texto(frame, geo)
 
     db._enteros(poblacion, ("poblacion",))
     db._enteros(poblacion_area, ("poblacion",))
     db._enteros(nac_edad, ("nacimientos",))
+    db._enteros(nac_padres, ("nacimientos",))
+    db._enteros(estado_conyugal, ("nacimientos", "orden_estado_civil"))
+    db._enteros(estado_civil, ("nacimientos", "orden_estado_civil"))
     db._enteros(nac_perfil, ("nacimientos",))
     db._enteros(def_edad, ("defunciones",))
     db._enteros(externas, ("defunciones",))
+    db._enteros(caracterizacion, ("anio", "nacimientos"))
     _texto(poblacion, ("sexo", "grupo_edad"))
     _texto(poblacion_area, ("area",))
     _texto(nac_edad, ("grupo_edad_madre",))
+    _texto(nac_padres, ("edad_padre_grupo", "edad_madre_grupo"))
+    _texto(estado_conyugal, ("estado_civil",))
+    _texto(estado_civil, ("estado_civil",))
     _texto(nac_perfil, ("dimension", "categoria"))
+    _texto(caracterizacion, ("dimension", "categoria", "subcategoria"))
     def_edad["grupo_edad"] = def_edad["grupo_edad"].map(grupo_defuncion)
     def_edad = (
         def_edad.groupby(
@@ -359,10 +489,14 @@ def cargar_analisis() -> dict:
         "poblacion": poblacion,
         "poblacion_area": poblacion_area,
         "nac_edad": nac_edad,
+        "nac_padres": nac_padres,
+        "estado_conyugal": estado_conyugal,
+        "estado_civil": estado_civil,
         "nac_perfil": nac_perfil,
         "def_edad": def_edad,
         "externas": externas,
         "intervalos": intervalos,
+        "caracterizacion": caracterizacion,
     }
     return _ANALISIS
 

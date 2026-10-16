@@ -833,6 +833,53 @@ export function sqlPerfilEdadMadre(filtros, anioBase, anioActual) {
   `;
 }
 
+export function sqlHeatmapEdadesPadres(filtros) {
+  return `
+    SELECT edad_padre_grupo, edad_madre_grupo,
+           SUM(nacimientos)::DOUBLE AS nacimientos
+    FROM nac_padres
+    WHERE ${whereTerritorio(filtros)}
+    GROUP BY 1, 2
+  `;
+}
+
+export function sqlEstadoCivilMadre(filtros, indicador) {
+  const tabla = indicador === "civil" ? "estado_civil" : "estado_conyugal";
+  return `
+    SELECT estado_civil AS categoria,
+           MIN(orden_estado_civil) AS orden,
+           SUM(nacimientos)::DOUBLE AS nacimientos
+    FROM ${tabla}
+    WHERE ${whereTerritorio(filtros)}
+    GROUP BY estado_civil
+    ORDER BY orden, categoria
+  `;
+}
+
+export function sqlCaracterizacion(filtros, dimension) {
+  return `
+    SELECT categoria, subcategoria, SUM(nacimientos)::DOUBLE AS nacimientos
+    FROM caracterizacion
+    WHERE dimension = ${literal(dimension)} AND ${whereTerritorio(filtros)}
+    GROUP BY 1, 2
+  `;
+}
+
+export function sqlIndicadoresCaracterizacion(filtros) {
+  return `
+    SELECT
+      (SELECT SUM(nacimientos)::DOUBLE FROM nac_perfil WHERE dimension = 'area' AND ${whereTerritorio(filtros)}) AS nacimientos,
+      SUM(CASE WHEN dimension = 'multiplicidad' AND categoria IN ('Doble', 'Trillizos', 'Cuatrillizos o más') THEN nacimientos ELSE 0 END)::DOUBLE AS multiples,
+      SUM(CASE WHEN dimension = 'multiplicidad' AND categoria <> 'Sin información' THEN nacimientos ELSE 0 END)::DOUBLE AS multiplicidad_reportada,
+      SUM(CASE WHEN dimension = 'hemoclasificacion' AND subcategoria = 'Positivo' THEN nacimientos ELSE 0 END)::DOUBLE AS rh_positivo,
+      SUM(CASE WHEN dimension = 'hemoclasificacion' AND subcategoria IN ('Positivo', 'Negativo') THEN nacimientos ELSE 0 END)::DOUBLE AS rh_reportado,
+      SUM(CASE WHEN dimension = 'controles_prenatales' AND subcategoria IN ('4-6', '7-9', '10 o más') THEN nacimientos ELSE 0 END)::DOUBLE AS controles_4_mas,
+      SUM(CASE WHEN dimension = 'controles_prenatales' AND subcategoria <> 'Sin información' THEN nacimientos ELSE 0 END)::DOUBLE AS controles_reportados
+    FROM caracterizacion
+    WHERE ${whereTerritorio(filtros)}
+  `;
+}
+
 export async function cargarCatalogos(consultar) {
   const [anios, departamentos, municipios, aniosIntervalos, edadMadre, nivelEducativo, regimenes, tiposParto] = await Promise.all([
     consultar("SELECT DISTINCT anio FROM panorama ORDER BY anio DESC"),
