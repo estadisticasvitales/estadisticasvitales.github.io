@@ -84,7 +84,11 @@ export function Fecundidad() {
           />
         </div>
         <SerieTgf sql={sqlSerieFecundidad(filtros)} />
-        <CambioTgf sql={sqlTgfCambioDepartamentos()} />
+        <CambioTgf
+          sql={sqlTgfCambioDepartamentos(anioBase, anioActual)}
+          anioBase={anioBase}
+          anioActual={anioActual}
+        />
         <RankingTasas
           titulo="Territorios con mayor TGF"
           sql={sqlRankingTgf(filtros)}

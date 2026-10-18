@@ -500,8 +500,9 @@ export function nombreDepartamento(filtros, municipios = []) {
   return null;
 }
 
-export function sqlTgfCambioDepartamentos() {
+export function sqlTgfCambioDepartamentos(anioBase, anioActual) {
   const tgf = GRUPOS_TGF.map(literal).join(", ");
+  const anios = [...new Set([Number(anioBase), Number(anioActual)])].join(", ");
   return `
     WITH nac AS (
       SELECT anio,
@@ -511,6 +512,7 @@ export function sqlTgfCambioDepartamentos() {
              SUM(nacimientos)::DOUBLE AS nacimientos
       FROM nac_edad
       WHERE departamento <> '' AND grupo_edad_madre IN (${tgf})
+        AND anio IN (${anios})
       GROUP BY anio, cod_departamento, grupo_edad_madre
     ),
     muj AS (
@@ -520,6 +522,7 @@ export function sqlTgfCambioDepartamentos() {
              SUM(poblacion)::DOUBLE AS mujeres
       FROM poblacion
       WHERE sexo = 'Mujeres' AND ${MADRE_DESDE_POB} IN (${tgf})
+        AND anio IN (${anios})
       GROUP BY 1, 2, 3
     ),
     fx AS (
@@ -868,7 +871,7 @@ export function sqlCaracterizacion(filtros, dimension) {
 export function sqlIndicadoresCaracterizacion(filtros) {
   return `
     SELECT
-      (SELECT SUM(nacimientos)::DOUBLE FROM nac_perfil WHERE dimension = 'area' AND ${whereTerritorio(filtros)}) AS nacimientos,
+      (SELECT SUM(nacimientos)::DOUBLE FROM caracterizacion WHERE dimension = 'multiplicidad' AND ${whereTerritorio(filtros)}) AS nacimientos,
       SUM(CASE WHEN dimension = 'multiplicidad' AND categoria IN ('Doble', 'Trillizos', 'Cuatrillizos o más') THEN nacimientos ELSE 0 END)::DOUBLE AS multiples,
       SUM(CASE WHEN dimension = 'multiplicidad' AND categoria <> 'Sin información' THEN nacimientos ELSE 0 END)::DOUBLE AS multiplicidad_reportada,
       SUM(CASE WHEN dimension = 'hemoclasificacion' AND subcategoria = 'Positivo' THEN nacimientos ELSE 0 END)::DOUBLE AS rh_positivo,
@@ -881,7 +884,7 @@ export function sqlIndicadoresCaracterizacion(filtros) {
 }
 
 export async function cargarCatalogos(consultar) {
-  const [anios, departamentos, municipios, aniosIntervalos, edadMadre, nivelEducativo, regimenes, tiposParto] = await Promise.all([
+  const [anios, departamentos, municipios, aniosIntervalos, aniosCaracterizacion, aniosFlujos, edadMadre, nivelEducativo, regimenes, tiposParto] = await Promise.all([
     consultar("SELECT DISTINCT anio FROM panorama ORDER BY anio DESC"),
     consultar(
       "SELECT DISTINCT departamento FROM geografia WHERE departamento <> '' ORDER BY departamento",
@@ -891,6 +894,8 @@ export async function cargarCatalogos(consultar) {
       FROM geografia
     `),
     consultar("SELECT DISTINCT anio FROM intervalos ORDER BY anio DESC"),
+    consultar("SELECT DISTINCT anio FROM caracterizacion ORDER BY anio DESC"),
+    consultar("SELECT DISTINCT anio FROM flujos_nacimientos ORDER BY anio DESC"),
     consultar(`SELECT DISTINCT ${EDAD_MADRE_GRUPO_SQL} AS valor FROM intervalos ORDER BY 1`),
     consultar(`SELECT DISTINCT ${NIVEL_EDUCATIVO_GRUPO_SQL} AS valor FROM intervalos ORDER BY 1`),
     consultar("SELECT DISTINCT seg_social_cat AS valor FROM intervalos ORDER BY 1"),
@@ -904,6 +909,8 @@ export async function cargarCatalogos(consultar) {
       .sort((a, b) => a.localeCompare(b, "es")),
     municipios: municipios.sort((a, b) => a.municipio.localeCompare(b.municipio, "es")),
     aniosIntervalos: aniosIntervalos.map((fila) => fila.anio),
+    aniosCaracterizacion: aniosCaracterizacion.map((fila) => fila.anio),
+    aniosFlujos: aniosFlujos.map((fila) => fila.anio),
     filtrosIntervalos: {
       edadMadre: edadMadre.map((fila) => fila.valor),
       nivelEducativo: nivelEducativo.map((fila) => fila.valor),

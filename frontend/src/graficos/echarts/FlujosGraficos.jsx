@@ -7,10 +7,16 @@ import { Grafico } from "@/graficos/echarts/Grafico";
 import { COLORES_TEMA } from "@/graficos/echarts/motor";
 import { ejeCategoria, ejeValor, tooltip } from "@/graficos/echarts/opciones";
 
+function condicionAnio(filtros, alias = "") {
+  if (!filtros.anio || filtros.anio === "Todos") return "TRUE";
+  return `${alias ? `${alias}.` : ""}anio = ${Number(filtros.anio)}`;
+}
+
 function whereDepartamento(filtros, alias = "f") {
-  if (!filtros.departamento || filtros.departamento === "Todos") return "TRUE";
+  const anio = condicionAnio(filtros, alias);
+  if (!filtros.departamento || filtros.departamento === "Todos") return anio;
   const nombre = literal(filtros.departamento);
-  return `(${alias}.departamento_ocurrencia = ${nombre} OR ${alias}.departamento_residencia = ${nombre})`;
+  return `${anio} AND (${alias}.departamento_ocurrencia = ${nombre} OR ${alias}.departamento_residencia = ${nombre})`;
 }
 
 function sqlRutas(filtros) {
@@ -57,7 +63,7 @@ function sqlHeatmap(filtros) {
   return `
     WITH totales AS (
       SELECT cod_residencia, SUM(nacimientos)::DOUBLE AS total_residentes
-      FROM flujos_nacimientos GROUP BY cod_residencia
+      FROM flujos_nacimientos WHERE ${condicionAnio(filtros)} GROUP BY cod_residencia
     )
     SELECT f.departamento_residencia, f.departamento_ocurrencia,
            f.nacimientos::DOUBLE / NULLIF(t.total_residentes, 0) AS porcentaje,
@@ -97,19 +103,34 @@ export function HeatmapFlujos({ filtros }) {
 }
 
 function sqlSistema(filtros) {
+  const condicion = condicionAnio(filtros);
   return `
-    WITH residentes AS (
-      SELECT cod_residencia AS codigo, departamento_residencia AS departamento,
+    WITH residentes_anuales AS (
+      SELECT anio, cod_residencia, departamento_residencia,
              MAX(nacimientos_residencia)::DOUBLE AS total_residentes,
              MAX(nacimientos_fuera_residencia)::DOUBLE AS expulsan
-      FROM flujos_nacimientos GROUP BY 1, 2
-    ),
-    ocurrencias AS (
-      SELECT cod_ocurrencia AS codigo, departamento_ocurrencia AS departamento,
-             MAX(nacimientos_ocurrencia)::DOUBLE AS atendidos,
-             SUM(CASE WHEN cod_ocurrencia <> cod_residencia THEN nacimientos ELSE 0 END)::DOUBLE AS atraen,
-             COUNT(DISTINCT cod_residencia) FILTER (WHERE cod_ocurrencia <> cod_residencia) AS deptos_atendidos
-      FROM flujos_nacimientos GROUP BY 1, 2
+      FROM flujos_nacimientos WHERE ${condicion} GROUP BY 1, 2, 3
+    ), residentes AS (
+      SELECT cod_residencia AS codigo, MAX(departamento_residencia) AS departamento,
+             SUM(total_residentes)::DOUBLE AS total_residentes,
+             SUM(expulsan)::DOUBLE AS expulsan
+      FROM residentes_anuales GROUP BY cod_residencia
+    ), ocurrencias_anuales AS (
+      SELECT anio, cod_ocurrencia, MAX(departamento_ocurrencia) AS departamento,
+             MAX(nacimientos_ocurrencia)::DOUBLE AS atendidos
+      FROM flujos_nacimientos WHERE ${condicion} GROUP BY 1, 2
+    ), ocurrencias_totales AS (
+      SELECT cod_ocurrencia, SUM(atendidos)::DOUBLE AS atendidos
+      FROM ocurrencias_anuales GROUP BY cod_ocurrencia
+    ), ocurrencias AS (
+      SELECT f.cod_ocurrencia AS codigo, MAX(f.departamento_ocurrencia) AS departamento,
+             MAX(t.atendidos)::DOUBLE AS atendidos,
+             SUM(CASE WHEN f.cod_ocurrencia <> f.cod_residencia THEN f.nacimientos ELSE 0 END)::DOUBLE AS atraen,
+             COUNT(DISTINCT f.cod_residencia) FILTER (WHERE f.cod_ocurrencia <> f.cod_residencia) AS deptos_atendidos
+      FROM flujos_nacimientos f
+      JOIN ocurrencias_totales t USING (cod_ocurrencia)
+      WHERE ${condicionAnio(filtros, "f")}
+      GROUP BY f.cod_ocurrencia
     )
     SELECT COALESCE(o.codigo, r.codigo) AS codigo,
            COALESCE(o.departamento, r.departamento) AS departamento,

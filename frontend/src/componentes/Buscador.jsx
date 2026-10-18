@@ -69,6 +69,7 @@ export function Buscador({
   vacioEtiqueta,
   opciones,
   alElegir,
+  incluirVacio = true,
   buscar = true,
 }) {
   const listaId = useId();
@@ -84,10 +85,10 @@ export function Buscador({
       : (opciones.find((opcion) => opcion.valor === valor)?.etiqueta ?? vacioEtiqueta);
 
   const visibles = useMemo(() => {
-    const todas = [{ valor: vacioValor, etiqueta: vacioEtiqueta }, ...opciones];
+    const todas = incluirVacio ? [{ valor: vacioValor, etiqueta: vacioEtiqueta }, ...opciones] : opciones;
     if (!buscar) return todas;
     return filtrarOpciones(todas, consulta);
-  }, [buscar, consulta, opciones, vacioEtiqueta, vacioValor]);
+  }, [buscar, consulta, incluirVacio, opciones, vacioEtiqueta, vacioValor]);
 
   useEffect(() => {
     setActivo(0);

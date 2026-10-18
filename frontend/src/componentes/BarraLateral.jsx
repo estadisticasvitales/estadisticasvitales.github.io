@@ -23,10 +23,11 @@ export function BarraLateral({ pagina }) {
     useConsulta(consultaCausas);
 
   const anios = useMemo(
-    () => (pagina === "intervalos" ? catalogos.aniosIntervalos : pagina === "flujos" || pagina === "padres" ? [2025] : catalogos.anios)
+    () => (pagina === "intervalos" ? catalogos.aniosIntervalos : pagina === "flujos" ? catalogos.aniosFlujos : pagina === "padres" ? catalogos.aniosCaracterizacion : catalogos.anios)
       .map((anio) => ({ valor: String(anio), etiqueta: String(anio) })),
-    [catalogos.anios, catalogos.aniosIntervalos, pagina],
+    [catalogos.anios, catalogos.aniosCaracterizacion, catalogos.aniosFlujos, catalogos.aniosIntervalos, pagina],
   );
+  const anioTodosDisponible = !["caida", "fecundidad", "intervalos", "padres"].includes(pagina);
 
   const departamentos = useMemo(
     () => catalogos.departamentos.map((nombre) => ({ valor: nombre, etiqueta: nombre })),
@@ -66,20 +67,11 @@ export function BarraLateral({ pagina }) {
   }, [actualizar, cargandoCausas, causasDisponibles, errorCausas, filtros.causa, pagina]);
 
   useEffect(() => {
-    if (pagina !== "intervalos" || !catalogos.aniosIntervalos.length) return;
-    const anioActual = Number(filtros.anio);
-    if (!catalogos.aniosIntervalos.includes(anioActual)) {
-      actualizar("anio", String(catalogos.aniosIntervalos[0]));
+    if (anioTodosDisponible || !anios.length) return;
+    if (!anios.some((opcion) => opcion.valor === String(filtros.anio))) {
+      actualizar("anio", anios[0].valor);
     }
-  }, [actualizar, catalogos.aniosIntervalos, filtros.anio, pagina]);
-
-  useEffect(() => {
-    if (pagina === "flujos" && filtros.anio !== "2025") actualizar("anio", "2025");
-  }, [actualizar, filtros.anio, pagina]);
-
-  useEffect(() => {
-    if (pagina === "padres" && filtros.anio !== "2025") actualizar("anio", "2025");
-  }, [actualizar, filtros.anio, pagina]);
+  }, [actualizar, anioTodosDisponible, anios, filtros.anio]);
 
   const hayFiltros =
     filtros.departamento !== "Todos" ||
@@ -111,8 +103,9 @@ export function BarraLateral({ pagina }) {
         buscar={false}
         valor={String(filtros.anio)}
         vacioValor="Todos"
-        vacioEtiqueta="Todos"
+        vacioEtiqueta={pagina === "flujos" ? "Todos los años" : "Todos"}
         opciones={anios}
+        incluirVacio={anioTodosDisponible}
         alElegir={(siguiente) => actualizar("anio", siguiente)}
       />
       <Buscador
