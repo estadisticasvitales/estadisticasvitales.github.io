@@ -15,14 +15,25 @@ const INICIAL = {
   tipoParto: "Todos",
 };
 
+function ultimoAnioDisponible(catalogos) {
+  const anios = [
+    ...(catalogos?.anios ?? []),
+    ...(catalogos?.aniosIntervalos ?? []),
+    ...(catalogos?.aniosCaracterizacion ?? []),
+    ...(catalogos?.aniosFlujos ?? []),
+  ].map(Number).filter(Number.isFinite);
+  return anios.length ? String(Math.max(...anios)) : null;
+}
+
 export function FiltrosProvider({ children }) {
   const { catalogos, listo } = useDatos();
   const [filtros, setFiltros] = useState(INICIAL);
+  const anioPredeterminado = ultimoAnioDisponible(catalogos);
 
   useEffect(() => {
     if (!listo || filtros.anio !== null) return;
-    setFiltros((actual) => ({ ...actual, anio: String(catalogos.anios[0]) }));
-  }, [catalogos, filtros.anio, listo]);
+    setFiltros((actual) => ({ ...actual, anio: anioPredeterminado }));
+  }, [anioPredeterminado, filtros.anio, listo]);
 
   const valor = useMemo(
     () => ({
@@ -38,6 +49,7 @@ export function FiltrosProvider({ children }) {
       reiniciar() {
         setFiltros((actual) => ({
           ...actual,
+          anio: anioPredeterminado,
           departamento: "Todos",
           municipio: "Todos",
           causa: "Todas",
@@ -49,7 +61,7 @@ export function FiltrosProvider({ children }) {
         }));
       },
     }),
-    [filtros],
+    [anioPredeterminado, filtros],
   );
 
   return <FiltrosContext.Provider value={valor}>{children}</FiltrosContext.Provider>;

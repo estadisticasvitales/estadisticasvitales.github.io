@@ -12,7 +12,7 @@ function porcentaje(valor) {
   return `${signo}${decimal(Math.abs(valor))}%`;
 }
 
-function extremos(filas) {
+function extremos(filas, anioBase, anioActual) {
   const porDepartamento = new Map();
   for (const fila of filas) {
     const tgf = Number(fila.tgf);
@@ -26,10 +26,9 @@ function extremos(filas) {
   }
   return [...porDepartamento.values()]
     .map((departamento) => {
-      const orden = departamento.puntos.sort((a, b) => a.anio - b.anio);
-      const inicio = orden[0];
-      const fin = orden[orden.length - 1];
-      if (!inicio || inicio.anio === fin.anio || !inicio.tgf) return null;
+      const inicio = departamento.puntos.find((punto) => punto.anio === Number(anioBase));
+      const fin = departamento.puntos.find((punto) => punto.anio === Number(anioActual));
+      if (!inicio || !fin || inicio.anio === fin.anio || !inicio.tgf) return null;
       return {
         departamento: departamento.departamento,
         anioInicio: inicio.anio,
@@ -43,11 +42,14 @@ function extremos(filas) {
     .sort((a, b) => a.cambio - b.cambio);
 }
 
-export function CambioTgf({ sql }) {
+export function CambioTgf({ sql, anioBase, anioActual }) {
   const { filas, cargando, error } = useConsulta(sql);
-  const datos = useMemo(() => extremos(filas), [filas]);
-  const anioInicio = datos.reduce((menor, fila) => Math.min(menor, fila.anioInicio), Infinity);
-  const anioFin = datos.reduce((mayor, fila) => Math.max(mayor, fila.anioFin), -Infinity);
+  const datos = useMemo(
+    () => extremos(filas, anioBase, anioActual),
+    [filas, anioBase, anioActual],
+  );
+  const anioInicio = Number(anioBase);
+  const anioFin = Number(anioActual);
   const contenido = datos.length * 26 + 72;
 
   const opcion = useMemo(() => {
@@ -201,12 +203,12 @@ export function CambioTgf({ sql }) {
   return (
     <Tarjeta
       titulo="Cambio de la tasa global de fecundidad"
-      ayuda="Cambio porcentual de la TGF entre el primer y el último año disponible para cada departamento. Los puntos muestran las tasas de inicio y fin; las flechas indican la dirección del cambio."
+      ayuda={`Cambio porcentual de la TGF entre ${anioBase} y ${anioActual}. Los puntos muestran las tasas de inicio y fin; las flechas indican la dirección del cambio.`}
       cargando={cargando && datos.length === 0}
       error={error}
     >
       {datos.length === 0 && !cargando ? (
-        <Vacio>No hay TGF departamental para comparar.</Vacio>
+        <Vacio>Selecciona un año diferente al base para comparar.</Vacio>
       ) : (
         <Grafico opcion={opcion} contenido={contenido} cargando={cargando} />
       )}

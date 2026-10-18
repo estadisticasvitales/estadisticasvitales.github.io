@@ -6,11 +6,16 @@ import { decimal, entero } from "@/estilos/tema";
 import { HeatmapFlujos, RankingCapitales, RutasFlujos, ScatterFlujos } from "@/graficos/echarts/FlujosGraficos";
 import { MapaCoropletas } from "@/graficos/echarts/MapaCoropletas";
 
-const ANIO_FIJO = 2025;
 const ESCALA_SALDO = ["#9f1239", "#fda4af", "#e2e8f0", "#7dd3fc", "#0369a1"];
 const FORMATO_PORCENTAJE = (valor) => `${decimal(100 * valor)}%`;
 
+function condicionAnio(filtros, tabla = "") {
+  if (!filtros.anio || filtros.anio === "Todos") return "TRUE";
+  return `${tabla ? `${tabla}.` : ""}anio = ${Number(filtros.anio)}`;
+}
+
 function sqlIndicadores(filtros) {
+  const condicion = condicionAnio(filtros);
   const departamento = filtros.departamento && filtros.departamento !== "Todos"
     ? `WHERE departamento = ${literal(filtros.departamento)}`
     : "";
@@ -24,12 +29,14 @@ function sqlIndicadores(filtros) {
              MAX(nacimientos_residencia)::DOUBLE AS total_residentes,
              MAX(nacimientos_fuera_residencia)::DOUBLE AS nacimientos_fuera,
              0::DOUBLE AS nacimientos_recibidos
-      FROM flujos_nacimientos GROUP BY cod_residencia, departamento_residencia
+      FROM flujos_nacimientos WHERE ${condicion}
+      GROUP BY anio, cod_residencia, departamento_residencia
       UNION ALL
       SELECT departamento_ocurrencia,
              0::DOUBLE, 0::DOUBLE,
              SUM(CASE WHEN cod_ocurrencia <> cod_residencia THEN nacimientos ELSE 0 END)::DOUBLE
-      FROM flujos_nacimientos GROUP BY departamento_ocurrencia
+      FROM flujos_nacimientos WHERE ${condicion}
+      GROUP BY anio, departamento_ocurrencia
     ) resumen
     ${departamento}
     GROUP BY departamento
@@ -37,6 +44,7 @@ function sqlIndicadores(filtros) {
 }
 
 function sqlDependencia(filtros) {
+  const condicion = condicionAnio(filtros);
   const departamento = filtros.departamento && filtros.departamento !== "Todos"
     ? `HAVING MAX(departamento_residencia) = ${literal(filtros.departamento)}`
     : "";
@@ -48,12 +56,14 @@ function sqlDependencia(filtros) {
            SUM(CASE WHEN cod_ocurrencia <> cod_residencia THEN nacimientos ELSE 0 END)::DOUBLE
              / NULLIF(SUM(nacimientos), 0) AS valor
     FROM flujos_nacimientos
+    WHERE ${condicion}
     GROUP BY cod_residencia
     ${departamento}
   `;
 }
 
 function sqlSaldoMapa(filtros) {
+  const condicion = condicionAnio(filtros);
   const departamento = filtros.departamento && filtros.departamento !== "Todos"
     ? `WHERE COALESCE(l.departamento, s.departamento) = ${literal(filtros.departamento)}`
     : "";
@@ -61,13 +71,18 @@ function sqlSaldoMapa(filtros) {
     WITH salidas AS (
       SELECT cod_residencia AS codigo, MAX(departamento_residencia) AS departamento,
              SUM(CASE WHEN cod_ocurrencia <> cod_residencia THEN nacimientos ELSE 0 END)::DOUBLE AS salen
-      FROM flujos_nacimientos GROUP BY cod_residencia
+      FROM flujos_nacimientos WHERE ${condicion} GROUP BY cod_residencia
     ),
-    llegadas AS (
-      SELECT cod_ocurrencia AS codigo, MAX(departamento_ocurrencia) AS departamento,
+    ocurrencias_anuales AS (
+      SELECT anio, cod_ocurrencia, MAX(departamento_ocurrencia) AS departamento,
              SUM(CASE WHEN cod_ocurrencia <> cod_residencia THEN nacimientos ELSE 0 END)::DOUBLE AS llegan,
              MAX(nacimientos_ocurrencia)::DOUBLE AS atendidos
-      FROM flujos_nacimientos GROUP BY cod_ocurrencia
+      FROM flujos_nacimientos WHERE ${condicion} GROUP BY anio, cod_ocurrencia
+    ),
+    llegadas AS (
+      SELECT cod_ocurrencia AS codigo, MAX(departamento) AS departamento,
+             SUM(llegan)::DOUBLE AS llegan, SUM(atendidos)::DOUBLE AS atendidos
+      FROM ocurrencias_anuales GROUP BY cod_ocurrencia
     )
     SELECT COALESCE(l.codigo, s.codigo) AS codigo,
            COALESCE(l.departamento, s.departamento) AS nombre,
@@ -82,14 +97,17 @@ function sqlSaldoMapa(filtros) {
 export function FlujosObstetricos() {
   const { filtros } = useFiltros();
   const { filas: resumen, error: errorResumen } = useConsulta(sqlIndicadores(filtros));
+  const condicion = condicionAnio(filtros);
+  const filtroDepartamento = filtros.departamento && filtros.departamento !== "Todos"
+    ? `AND departamento_ocurrencia = ${literal(filtros.departamento)}`
+    : "";
   const { filas: totalAnual, error: errorTotalAnual } = useConsulta(`
     SELECT COALESCE(SUM(nacimientos_ocurrencia), 0)::DOUBLE AS nacimientos
     FROM (
-      SELECT cod_ocurrencia, MAX(nacimientos_ocurrencia)::DOUBLE AS nacimientos_ocurrencia
+      SELECT anio, cod_ocurrencia, MAX(nacimientos_ocurrencia)::DOUBLE AS nacimientos_ocurrencia
       FROM flujos_nacimientos
-      WHERE anio = ${ANIO_FIJO}
-        AND ${filtros.departamento && filtros.departamento !== "Todos" ? `departamento_ocurrencia = ${literal(filtros.departamento)}` : "TRUE"}
-      GROUP BY cod_ocurrencia
+      WHERE ${condicion} ${filtroDepartamento}
+      GROUP BY anio, cod_ocurrencia
     ) por_departamento
   `);
 
@@ -105,7 +123,7 @@ export function FlujosObstetricos() {
     <FilaIndicadores>
       <Indicador titulo="Nacimientos de residentes" valor={entero(totalResidentes)} tono="nacimientos" />
       <Indicador titulo="Partos fuera del departamento" valor={totalResidentes ? `${decimal(100 * tasaFuera)}%` : "—"} tono="diferencia" ayuda="Porcentaje de nacimientos de residentes que ocurrieron en otro departamento." />
-      <Indicador titulo="Atendidos en el territorio" valor={entero(atendidos)} tono="hombres" ayuda="Nacimientos ocurridos en el departamento seleccionado; sin filtro, corresponde al total nacional de 2025." />
+      <Indicador titulo="Atendidos en el territorio" valor={entero(atendidos)} tono="hombres" ayuda={filtros.anio === "Todos" ? "Nacimientos ocurridos en el departamento seleccionado durante todos los años disponibles." : `Nacimientos ocurridos en el departamento seleccionado durante ${filtros.anio}.`} />
       <Indicador titulo="Recibidos desde otros departamentos" valor={entero(nacimientosRecibidos)} tono="relacion" />
     </FilaIndicadores>
     <div className="rejilla">
@@ -138,6 +156,6 @@ export function FlujosObstetricos() {
       <HeatmapFlujos filtros={filtros} />
       <ScatterFlujos filtros={filtros} />
     </div>
-    <p className="nota nota-pie">Fuente: vista materializada de flujos de nacimientos cruzada con geografía. Año disponible: {ANIO_FIJO}. Los resultados son descriptivos; no representan medidas de calidad ni capacidad hospitalaria.</p>
+    <p className="nota nota-pie">Fuente: nacimientos y códigos geográficos de residencia y ocurrencia de la madre cruzados con geografía. Periodo: {filtros.anio === "Todos" ? "todos los años disponibles" : filtros.anio}. Los resultados son acumulados para el periodo y descriptivos; no representan medidas de calidad ni capacidad hospitalaria.</p>
   </>;
 }

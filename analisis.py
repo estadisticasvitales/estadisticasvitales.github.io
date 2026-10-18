@@ -175,7 +175,7 @@ def cargar_caracterizacion(conn) -> pd.DataFrame:
                  CASE WHEN f.n_emb ~ '^[0-9]+$' AND f.n_emb::integer BETWEEN 1 AND 98 THEN CASE WHEN f.n_emb::integer >= 5 THEN '5 o más' ELSE f.n_emb::integer::text END END AS grupo_embarazos,
                  CASE WHEN f.n_hijosv ~ '^[0-9]+$' AND f.n_hijosv::integer BETWEEN 1 AND 98 THEN CASE WHEN f.n_hijosv::integer >= 5 THEN '5 o más' ELSE f.n_hijosv::integer::text END END AS grupo_hijos,
                  CASE WHEN f.numconsul ~ '^[0-9]+$' AND f.numconsul::integer BETWEEN 0 AND 98 THEN CASE WHEN f.numconsul::integer = 0 THEN '0' WHEN f.numconsul::integer <= 3 THEN '1-3' WHEN f.numconsul::integer <= 6 THEN '4-6' WHEN f.numconsul::integer <= 9 THEN '7-9' ELSE '10 o más' END ELSE 'Sin información' END AS grupo_consultas
-          FROM nacimientos.fact_nac_2025 f
+          FROM nacimientos.fact_nacimientos f
           JOIN geografia.dim_geografia g
             ON TRIM(g.cod_departamento::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0')
            AND TRIM(g.cod_municipio::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0') || LPAD(TRIM(f.cod_munic::text), 3, '0')
@@ -295,7 +295,7 @@ def cargar_analisis() -> dict:
                            WHEN '9' THEN '50-54 años' WHEN '99' THEN 'Sin información'
                            ELSE 'No clasificado'
                        END AS edad_madre_grupo
-                FROM nacimientos.fact_nac_2025 f
+                FROM nacimientos.fact_nacimientos f
                 LEFT JOIN geografia.dim_geografia g
                   ON TRIM(g.cod_departamento::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0')
                  AND TRIM(g.cod_municipio::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0') || LPAD(TRIM(f.cod_munic::text), 3, '0')
@@ -312,30 +312,50 @@ def cargar_analisis() -> dict:
         estado_conyugal = db._consultar(
             conn,
             """
-            SELECT anio,
-                   LPAD(TRIM(cod_departamento::text), 2, '0') AS cod_departamento,
-                   LPAD(TRIM(cod_departamento::text), 2, '0')
-                     || LPAD(TRIM(cod_municipio_dane::text), 3, '0') AS cod_municipio,
-                   departamento, municipio, estado_civil, orden_estado_civil,
-                   SUM(nacimientos)::bigint AS nacimientos
-            FROM nacimientos.mv_estado_conyugal_madre
-            GROUP BY anio, cod_departamento, cod_municipio_dane, departamento,
-                     municipio, estado_civil, orden_estado_civil
+            SELECT f.ano::integer AS anio,
+                   LPAD(TRIM(f.cod_dpto::text), 2, '0') AS cod_departamento,
+                   g.departamento,
+                   LPAD(TRIM(f.cod_dpto::text), 2, '0') || LPAD(TRIM(f.cod_munic::text), 3, '0') AS cod_municipio,
+                   g.municipio,
+                   CASE f.est_civm
+                     WHEN '5' THEN 'Pareja: 2 años o más'
+                     WHEN '6' THEN 'Pareja: menos de 2 años'
+                     WHEN '4' THEN 'Separada o divorciada'
+                     WHEN '3' THEN 'Viuda'
+                     WHEN '1' THEN 'Soltera'
+                     WHEN '2' THEN 'Casada'
+                     ELSE 'Sin información'
+                   END AS estado_civil,
+                   CASE f.est_civm WHEN '5' THEN 1 WHEN '6' THEN 2 WHEN '4' THEN 3
+                     WHEN '3' THEN 4 WHEN '1' THEN 5 WHEN '2' THEN 6 ELSE 9 END AS orden_estado_civil,
+                   COUNT(*)::bigint AS nacimientos
+            FROM nacimientos.fact_nacimientos f
+            JOIN geografia.dim_geografia g
+              ON TRIM(g.cod_departamento::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0')
+             AND TRIM(g.cod_municipio::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0') || LPAD(TRIM(f.cod_munic::text), 3, '0')
+            GROUP BY 1, 2, 3, 4, 5, 6, 7
             """,
             (),
         )
         estado_civil = db._consultar(
             conn,
             """
-            SELECT anio,
-                   LPAD(TRIM(cod_departamento::text), 2, '0') AS cod_departamento,
-                   LPAD(TRIM(cod_departamento::text), 2, '0')
-                     || LPAD(TRIM(cod_municipio_dane::text), 3, '0') AS cod_municipio,
-                   departamento, municipio, estado_civil, orden_estado_civil,
-                   SUM(nacimientos)::bigint AS nacimientos
-            FROM nacimientos.mv_estado_civil_madre
-            GROUP BY anio, cod_departamento, cod_municipio_dane, departamento,
-                     municipio, estado_civil, orden_estado_civil
+            SELECT f.ano::integer AS anio,
+                   LPAD(TRIM(f.cod_dpto::text), 2, '0') AS cod_departamento,
+                   g.departamento,
+                   LPAD(TRIM(f.cod_dpto::text), 2, '0') || LPAD(TRIM(f.cod_munic::text), 3, '0') AS cod_municipio,
+                   g.municipio,
+                   CASE f.est_civm WHEN '5' THEN 'Unión libre' WHEN '6' THEN 'Unión libre'
+                     WHEN '4' THEN 'Separada o divorciada' WHEN '3' THEN 'Viuda'
+                     WHEN '1' THEN 'Soltera' WHEN '2' THEN 'Casada' ELSE 'Sin información' END AS estado_civil,
+                   CASE f.est_civm WHEN '5' THEN 1 WHEN '6' THEN 1 WHEN '2' THEN 2
+                     WHEN '1' THEN 3 WHEN '4' THEN 4 WHEN '3' THEN 5 ELSE 9 END AS orden_estado_civil,
+                   COUNT(*)::bigint AS nacimientos
+            FROM nacimientos.fact_nacimientos f
+            JOIN geografia.dim_geografia g
+              ON TRIM(g.cod_departamento::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0')
+             AND TRIM(g.cod_municipio::text) = LPAD(TRIM(f.cod_dpto::text), 2, '0') || LPAD(TRIM(f.cod_munic::text), 3, '0')
+            GROUP BY 1, 2, 3, 4, 5, 6, 7
             """,
             (),
         )
@@ -502,7 +522,7 @@ def cargar_analisis() -> dict:
 
 
 def cargar_flujos_nacimientos() -> pd.DataFrame:
-    """Lee los flujos residencia-ocurrencia agregados de la vista materializada."""
+    """Agrega los flujos residencia-ocurrencia desde los registros de nacimientos."""
     conn = db.conectar()
     try:
         with conn.cursor() as cur:
@@ -510,49 +530,45 @@ def cargar_flujos_nacimientos() -> pd.DataFrame:
         return db._consultar(
             conn,
             """
-            WITH ocurrencia AS (
-                SELECT ano AS anio, cod_dpto AS codigo,
+            WITH base AS (
+                SELECT ano::integer AS anio,
+                       LPAD(TRIM(cod_dpto::text), 2, '0') AS cod_ocurrencia,
+                       LPAD(TRIM(codptore::text), 2, '0') AS cod_residencia
+                FROM nacimientos.fact_nacimientos
+                WHERE cod_dpto IS NOT NULL AND codptore IS NOT NULL
+            ), ocurrencia AS (
+                SELECT anio, cod_ocurrencia,
                        COUNT(*)::bigint AS nacimientos_ocurrencia
-                FROM nacimientos.fact_nac_2025
-                WHERE ano = 2025 AND cod_dpto IS NOT NULL
-                GROUP BY ano, cod_dpto
-            ),
-            residencia AS (
-                SELECT ano AS anio, codptore AS codigo,
+                FROM base GROUP BY anio, cod_ocurrencia
+            ), residencia AS (
+                SELECT anio, cod_residencia,
                        COUNT(*)::bigint AS nacimientos_residencia,
-                       COUNT(*) FILTER (WHERE cod_dpto <> codptore)::bigint AS nacimientos_fuera_residencia
-                FROM nacimientos.fact_nac_2025
-                WHERE ano = 2025 AND codptore IS NOT NULL
-                GROUP BY ano, codptore
+                       COUNT(*) FILTER (WHERE cod_ocurrencia <> cod_residencia)::bigint AS nacimientos_fuera_residencia
+                FROM base GROUP BY anio, cod_residencia
+            ), pares AS (
+                SELECT anio, cod_ocurrencia, cod_residencia,
+                       COUNT(*)::bigint AS nacimientos
+                FROM base GROUP BY anio, cod_ocurrencia, cod_residencia
+            ), geo AS (
+                SELECT LPAD(TRIM(cod_departamento::text), 2, '0') AS codigo,
+                       MAX(departamento) AS departamento
+                FROM geografia.dim_geografia
+                WHERE cod_departamento IS NOT NULL
+                GROUP BY 1
             )
-            SELECT b.anio,
-                   b.cod_ocurrencia,
-                   MAX(g_ocu.departamento) AS departamento_ocurrencia,
-                   b.cod_residencia,
-                   MAX(g_res.departamento) AS departamento_residencia,
-                   SUM(b.nacimientos)::bigint AS nacimientos,
-                   MAX(o.nacimientos_ocurrencia)::bigint AS nacimientos_ocurrencia,
-                   MAX(r.nacimientos_residencia)::bigint AS nacimientos_residencia,
-                   MAX(r.nacimientos_fuera_residencia)::bigint AS nacimientos_fuera_residencia
-            FROM nacimientos.mv_flujos_nacimientos b
-            LEFT JOIN ocurrencia o
-              ON o.anio = b.anio AND o.codigo = b.cod_ocurrencia
-            LEFT JOIN residencia r
-              ON r.anio = b.anio AND r.codigo = b.cod_residencia
-            LEFT JOIN (
-                SELECT cod_departamento, MAX(departamento) AS departamento
-                FROM geografia.dim_geografia
-                WHERE cod_departamento IS NOT NULL
-                GROUP BY cod_departamento
-            ) g_ocu ON g_ocu.cod_departamento = b.cod_ocurrencia
-            LEFT JOIN (
-                SELECT cod_departamento, MAX(departamento) AS departamento
-                FROM geografia.dim_geografia
-                WHERE cod_departamento IS NOT NULL
-                GROUP BY cod_departamento
-            ) g_res ON g_res.cod_departamento = b.cod_residencia
-            WHERE b.anio = 2025
-            GROUP BY b.anio, b.cod_ocurrencia, b.cod_residencia
+            SELECT p.anio, p.cod_ocurrencia,
+                   g_ocu.departamento AS departamento_ocurrencia,
+                   p.cod_residencia,
+                   g_res.departamento AS departamento_residencia,
+                   p.nacimientos,
+                   o.nacimientos_ocurrencia,
+                   r.nacimientos_residencia,
+                   r.nacimientos_fuera_residencia
+            FROM pares p
+            LEFT JOIN ocurrencia o USING (anio, cod_ocurrencia)
+            LEFT JOIN residencia r USING (anio, cod_residencia)
+            LEFT JOIN geo g_ocu ON g_ocu.codigo = p.cod_ocurrencia
+            LEFT JOIN geo g_res ON g_res.codigo = p.cod_residencia
             """,
             (),
         )
