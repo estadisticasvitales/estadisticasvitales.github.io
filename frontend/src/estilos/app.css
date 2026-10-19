@@ -39,6 +39,20 @@ button, select, input { font: inherit; }
   border-bottom: 1px solid #e4eef6;
 }
 
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.marca-logo {
+  flex: none;
+  width: calc(1.15rem * 1.4 + 0.92rem * 1.4);
+  height: calc(1.15rem * 1.4 + 0.92rem * 1.4);
+  object-fit: contain;
+}
+
 .encabezado h1,
 .encabezado p { margin: 0; }
 
