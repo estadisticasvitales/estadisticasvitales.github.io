@@ -86,12 +86,15 @@ export function Disposicion() {
   return (
     <div className="app">
       <header className="encabezado">
-        <div>
-          <h1>Estadísticas Vitales: Nacimientos y Defunciones</h1>
-          <p>
-            Nacimientos y defunciones en Colombia publicadas por el Departamento Administrativo Nacional
-            de Estadística (DANE)
-          </p>
+        <div className="marca">
+          <img className="marca-logo" src="/favicon.png" alt="" />
+          <div>
+            <h1>Estadísticas Vitales: Nacimientos y Defunciones</h1>
+            <p>
+              Nacimientos y defunciones en Colombia publicadas por el Departamento Administrativo Nacional
+              de Estadística (DANE)
+            </p>
+          </div>
         </div>
         <nav className="menu">
           {MENU.map((item) => (

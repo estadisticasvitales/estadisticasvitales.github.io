@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import re
-import unicodedata
-
 import pandas as pd
 
 import db
@@ -36,48 +33,41 @@ CASE
 END
 """
 
-def _sin_tilde(texto: str) -> str:
-    base = unicodedata.normalize("NFKD", str(texto))
-    return "".join(ch for ch in base if not unicodedata.combining(ch)).lower()
-
-
-def grupo_defuncion(texto: str) -> str:
-    clave = _sin_tilde(texto)
-    if "desconoc" in clave:
-        return "Edad desconocida"
-    if "100" in clave:
-        return "De 100 y más"
-    if "hora" in clave or "dia" in clave or "mes" in clave:
-        return "Menor 1 año"
-    if clave.startswith("de 1 ano"):
-        return "De 1-4 años"
-    rango = re.search(r"de (\d+) a (\d+)", clave)
-    if rango:
-        inicio, fin = int(rango.group(1)), int(rango.group(2))
-        if inicio == 2 and fin == 4:
-            return "De 1-4 años"
-        return f"De {inicio}-{fin} años"
-    return "Edad desconocida"
+GRUPO_EDAD_DEFUNCION = f"""
+CASE {db.GRU_ED1}
+  WHEN '00' THEN 'Menor 1 año' WHEN '01' THEN 'Menor 1 año' WHEN '02' THEN 'Menor 1 año'
+  WHEN '03' THEN 'Menor 1 año' WHEN '04' THEN 'Menor 1 año' WHEN '05' THEN 'Menor 1 año'
+  WHEN '06' THEN 'Menor 1 año'
+  WHEN '07' THEN 'De 1-4 años' WHEN '08' THEN 'De 1-4 años'
+  WHEN '09' THEN 'De 5-9 años' WHEN '10' THEN 'De 10-14 años'
+  WHEN '11' THEN 'De 15-19 años' WHEN '12' THEN 'De 20-24 años'
+  WHEN '13' THEN 'De 25-29 años' WHEN '14' THEN 'De 30-34 años'
+  WHEN '15' THEN 'De 35-39 años' WHEN '16' THEN 'De 40-44 años'
+  WHEN '17' THEN 'De 45-49 años' WHEN '18' THEN 'De 50-54 años'
+  WHEN '19' THEN 'De 55-59 años' WHEN '20' THEN 'De 60-64 años'
+  WHEN '21' THEN 'De 65-69 años' WHEN '22' THEN 'De 70-74 años'
+  WHEN '23' THEN 'De 75-79 años' WHEN '24' THEN 'De 80-84 años'
+  WHEN '25' THEN 'De 85-89 años' WHEN '26' THEN 'De 90-94 años'
+  WHEN '27' THEN 'De 95-99 años' WHEN '28' THEN 'De 100 y más'
+  ELSE 'Edad desconocida'
+END
+"""
 
 GRUPO_MADRE = """
-CASE
-  WHEN f.grupo_edad_madre ILIKE '%%10-14%%' THEN '10-14'
-  WHEN f.grupo_edad_madre ILIKE '%%15-19%%' THEN '15-19'
-  WHEN f.grupo_edad_madre ILIKE '%%20-24%%' THEN '20-24'
-  WHEN f.grupo_edad_madre ILIKE '%%25-29%%' THEN '25-29'
-  WHEN f.grupo_edad_madre ILIKE '%%30-34%%' THEN '30-34'
-  WHEN f.grupo_edad_madre ILIKE '%%35-39%%' THEN '35-39'
-  WHEN f.grupo_edad_madre ILIKE '%%40-44%%' THEN '40-44'
-  WHEN f.grupo_edad_madre ILIKE '%%45-49%%' THEN '45-49'
-  WHEN f.grupo_edad_madre ILIKE '%%50-54%%' THEN '50-54'
+CASE BTRIM(f.edad_madre)
+  WHEN '1' THEN '10-14' WHEN '2' THEN '15-19' WHEN '3' THEN '20-24'
+  WHEN '4' THEN '25-29' WHEN '5' THEN '30-34' WHEN '6' THEN '35-39'
+  WHEN '7' THEN '40-44' WHEN '8' THEN '45-49' WHEN '9' THEN '50-54'
   ELSE 'Sin información'
 END
 """
 
+# area_res: 1 cabecera municipal, 2 centro poblado, 3 rural disperso.
 AREA_NAC = """
-CASE
-  WHEN f.area ILIKE 'Cabecera%%' THEN 'Cabecera'
-  WHEN f.area ILIKE 'Rural%%' OR f.area ILIKE 'Centro poblado%%' THEN 'Resto'
+CASE BTRIM(f.area_res)
+  WHEN '1' THEN 'Cabecera'
+  WHEN '2' THEN 'Resto'
+  WHEN '3' THEN 'Resto'
   ELSE 'Sin información'
 END
 """
@@ -87,23 +77,33 @@ CASE WHEN f.area ILIKE 'Cabecera%%' THEN 'Cabecera' ELSE 'Resto' END
 """
 
 EDUCACION = """
-CASE
-  WHEN f.nivel_educativo ILIKE '%%Ninguno%%' THEN 'Ninguno'
-  WHEN f.nivel_educativo ILIKE '%%Preescolar%%' THEN 'Preescolar'
-  WHEN f.nivel_educativo ILIKE '%%primaria%%' THEN 'Básica primaria'
-  WHEN f.nivel_educativo ILIKE '%%secundaria%%' THEN 'Básica secundaria'
-  WHEN f.nivel_educativo ILIKE '%%Media%%' OR f.nivel_educativo ILIKE '%%Normalista%%' THEN 'Media'
-  WHEN f.nivel_educativo ILIKE '%%T_cnica profesional%%' OR f.nivel_educativo ILIKE '%%Tecnol%%' THEN 'Técnica o tecnológica'
-  WHEN f.nivel_educativo ILIKE '%%Profesional%%' THEN 'Profesional'
-  WHEN f.nivel_educativo ILIKE '%%Especializa%%'
-    OR f.nivel_educativo ILIKE '%%Maestr%%'
-    OR f.nivel_educativo ILIKE '%%Doctorado%%' THEN 'Posgrado'
+CASE LPAD(BTRIM(f.niv_edum), 2, '0')
+  WHEN '13' THEN 'Ninguno'
+  WHEN '01' THEN 'Preescolar'
+  WHEN '02' THEN 'Básica primaria'
+  WHEN '03' THEN 'Básica secundaria'
+  WHEN '04' THEN 'Media' WHEN '05' THEN 'Media' WHEN '06' THEN 'Media'
+  WHEN '07' THEN 'Técnica o tecnológica' WHEN '08' THEN 'Técnica o tecnológica'
+  WHEN '09' THEN 'Profesional'
+  WHEN '10' THEN 'Posgrado' WHEN '11' THEN 'Posgrado' WHEN '12' THEN 'Posgrado'
   ELSE 'Sin información'
 END
 """
 
-CAUSA_EXTERNA = """
-CASE f.cod_causa
+REGIMEN = """
+CASE BTRIM(f.seg_social)
+  WHEN '1' THEN 'Contributivo'
+  WHEN '2' THEN 'Subsidiado'
+  WHEN '3' THEN 'Excepción'
+  WHEN '4' THEN 'Especial'
+  WHEN '5' THEN 'No asegurado'
+  ELSE 'Sin información'
+END
+"""
+
+# Causas externas de la lista 6/67: códigos 501 a 514.
+CAUSA_EXTERNA = f"""
+CASE {db.CAUSA_667}
   WHEN '512' THEN 'Homicidios'
   WHEN '511' THEN 'Suicidios'
   WHEN '501' THEN 'Accidentes de tránsito'
@@ -251,16 +251,16 @@ def cargar_analisis() -> dict:
         nac_edad = db._consultar(
             conn,
             f"""
-            SELECT f.anio,
+            SELECT f.ano::integer AS anio,
                    g.cod_departamento,
-                   g.departamento,
+                   MAX(g.departamento) AS departamento,
                    g.cod_municipio,
-                   g.municipio,
+                   MAX(g.municipio) AS municipio,
                    {GRUPO_MADRE} AS grupo_edad_madre,
-                   SUM(f.nacimientos)::bigint AS nacimientos
-            FROM nacimientos.fact_nac_edad_madre f
-            {db.CRUCE_GEOGRAFIA}
-            GROUP BY 1, 2, 3, 4, 5, 6
+                   COUNT(*)::bigint AS nacimientos
+            FROM nacimientos.fact_nacimientos f
+            {db.CRUCE_RESIDENCIA}
+            GROUP BY 1, 2, 4, 6
             """,
             (),
         )
@@ -362,74 +362,64 @@ def cargar_analisis() -> dict:
         nac_perfil = db._consultar(
             conn,
             f"""
-            SELECT f.anio,
-                   g.cod_departamento,
-                   g.departamento,
-                   g.cod_municipio,
-                   g.municipio,
-                   'area' AS dimension,
-                   {AREA_NAC} AS categoria,
-                   SUM(f.nacimientos)::bigint AS nacimientos
-            FROM nacimientos.fact_nac_residencia f
-            {db.CRUCE_GEOGRAFIA}
-            GROUP BY 1, 2, 3, 4, 5, 6, 7
+            WITH base AS (
+              SELECT f.ano::integer AS anio,
+                     g.cod_departamento,
+                     g.departamento,
+                     g.cod_municipio,
+                     g.municipio,
+                     {AREA_NAC} AS area,
+                     {EDUCACION} AS educacion,
+                     {REGIMEN} AS regimen
+              FROM nacimientos.fact_nacimientos f
+              {db.CRUCE_RESIDENCIA}
+            )
+            SELECT anio, cod_departamento, MAX(departamento) AS departamento,
+                   cod_municipio, MAX(municipio) AS municipio,
+                   'area' AS dimension, area AS categoria, COUNT(*)::bigint AS nacimientos
+            FROM base GROUP BY 1, 2, 4, 6, 7
             UNION ALL
-            SELECT f.anio,
-                   g.cod_departamento,
-                   g.departamento,
-                   g.cod_municipio,
-                   g.municipio,
-                   'educacion' AS dimension,
-                   {EDUCACION} AS categoria,
-                   SUM(f.nacimientos)::bigint AS nacimientos
-            FROM nacimientos.fact_nac_educacion f
-            {db.CRUCE_GEOGRAFIA}
-            GROUP BY 1, 2, 3, 4, 5, 6, 7
+            SELECT anio, cod_departamento, MAX(departamento), cod_municipio, MAX(municipio),
+                   'educacion', educacion, COUNT(*)::bigint
+            FROM base GROUP BY 1, 2, 4, 6, 7
             UNION ALL
-            SELECT f.anio,
-                   g.cod_departamento,
-                   g.departamento,
-                   g.cod_municipio,
-                   g.municipio,
-                   'regimen' AS dimension,
-                   COALESCE(NULLIF(f.regimen, ''), 'Sin información') AS categoria,
-                   SUM(f.nacimientos)::bigint AS nacimientos
-            FROM nacimientos.fact_nac_regimen_sitio f
-            {db.CRUCE_GEOGRAFIA}
-            GROUP BY 1, 2, 3, 4, 5, 6, 7
+            SELECT anio, cod_departamento, MAX(departamento), cod_municipio, MAX(municipio),
+                   'regimen', regimen, COUNT(*)::bigint
+            FROM base GROUP BY 1, 2, 4, 6, 7
             """,
             (),
         )
         def_edad = db._consultar(
             conn,
             f"""
-            SELECT f.anio,
+            SELECT f.ano::integer AS anio,
                    g.cod_departamento,
-                   g.departamento,
+                   MAX(g.departamento) AS departamento,
                    g.cod_municipio,
-                   g.municipio,
-                   f.grupo_edad,
-                   COALESCE(NULLIF(f.sexo, ''), 'Indeterminado') AS sexo,
-                   SUM(f.defunciones)::bigint AS defunciones
-            FROM defunciones.fact_def_edad_residencia f
-            {db.CRUCE_GEOGRAFIA}
-            GROUP BY 1, 2, 3, 4, 5, 6, 7
+                   MAX(g.municipio) AS municipio,
+                   {GRUPO_EDAD_DEFUNCION} AS grupo_edad,
+                   {db.SEXO_MICRODATO} AS sexo,
+                   COUNT(*)::bigint AS defunciones
+            FROM defunciones.fact_defunciones f
+            {db.CRUCE_RESIDENCIA}
+            GROUP BY 1, 2, 4, 6, 7
             """,
             (),
         )
         externas = db._consultar(
             conn,
             f"""
-            SELECT f.anio,
+            SELECT f.ano::integer AS anio,
                    g.cod_departamento,
-                   g.departamento,
+                   MAX(g.departamento) AS departamento,
                    g.cod_municipio,
-                   g.municipio,
+                   MAX(g.municipio) AS municipio,
                    {CAUSA_EXTERNA} AS causa,
-                   SUM(f.defunciones)::bigint AS defunciones
-            FROM defunciones.fact_def_externa f
-            {db.CRUCE_GEOGRAFIA}
-            GROUP BY 1, 2, 3, 4, 5, 6
+                   COUNT(*)::bigint AS defunciones
+            FROM defunciones.fact_defunciones f
+            {db.CRUCE_RESIDENCIA}
+            WHERE {db.CAUSA_667} BETWEEN '501' AND '514'
+            GROUP BY 1, 2, 4, 6
             """,
             (),
         )
@@ -466,14 +456,6 @@ def cargar_analisis() -> dict:
     _texto(estado_civil, ("estado_civil",))
     _texto(nac_perfil, ("dimension", "categoria"))
     _texto(caracterizacion, ("dimension", "categoria", "subcategoria"))
-    def_edad["grupo_edad"] = def_edad["grupo_edad"].map(grupo_defuncion)
-    def_edad = (
-        def_edad.groupby(
-            ["anio", "cod_departamento", "departamento", "cod_municipio", "municipio", "grupo_edad", "sexo"],
-            as_index=False,
-        )["defunciones"]
-        .sum()
-    )
     _texto(def_edad, ("grupo_edad", "sexo"))
     _texto(externas, ("causa",))
     _texto(

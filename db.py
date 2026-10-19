@@ -247,20 +247,60 @@ def opciones_municipio(municipios: pd.DataFrame, departamento: str | None) -> di
     return {TODOS: "Todos", **dict(pares)}
 
 
-# La vista colapsa países en Extranjero y los residuos en Sin Información.
-# El CASE lleva cada hecho a la fila visible de esa vista.
-CRUCE_GEOGRAFIA = """
+SEXO_MICRODATO = """
+CASE BTRIM(f.sexo)
+  WHEN '1' THEN 'Hombres'
+  WHEN '2' THEN 'Mujeres'
+  ELSE 'Indeterminado'
+END
+"""
+
+# Residencia en los microdatos (codptore, codmunre). Sin departamento o municipio:
+# Extranjero si el país de residencia (codpres) no es Colombia (170); si no,
+# Sin Información. Son las filas 75/75000 y 01/01999 de vw_dim_geografia.
+_RESIDENCIA_VACIA = """(
+  f.codptore IS NULL OR BTRIM(f.codptore) = ''
+  OR f.codmunre IS NULL OR BTRIM(f.codmunre) = ''
+)"""
+
+_RESIDENCIA_EXTRANJERA = """(
+  f.codpres IS NOT NULL
+  AND BTRIM(f.codpres) <> ''
+  AND LPAD(BTRIM(f.codpres), 3, '0') <> '170'
+)"""
+
+CRUCE_RESIDENCIA = f"""
 JOIN geografia.vw_dim_geografia g
-  ON g.cod_departamento = CASE f.tipo_registro
-       WHEN 'extranjero' THEN '75'
-       WHEN 'sin_informacion' THEN '01'
-       ELSE f.cod_departamento
+  ON g.cod_departamento = CASE
+       WHEN {_RESIDENCIA_VACIA} THEN
+         CASE WHEN {_RESIDENCIA_EXTRANJERA} THEN '75' ELSE '01' END
+       ELSE LPAD(BTRIM(f.codptore), 2, '0')
      END
- AND g.cod_municipio = CASE f.tipo_registro
-       WHEN 'extranjero' THEN '75000'
-       WHEN 'sin_informacion' THEN '01999'
-       ELSE f.cod_municipio
+ AND g.cod_municipio = CASE
+       WHEN {_RESIDENCIA_VACIA} THEN
+         CASE WHEN {_RESIDENCIA_EXTRANJERA} THEN '75000' ELSE '01999' END
+       ELSE LPAD(BTRIM(f.codptore), 2, '0') || LPAD(BTRIM(f.codmunre), 3, '0')
      END
+"""
+
+# De 2020 a 2023 los códigos de defunciones perdieron ceros a la izquierda.
+GRU_ED1 = "LPAD(BTRIM(f.gru_ed1), 2, '0')"
+CAUSA_667 = "LPAD(BTRIM(f.causa_667), 3, '0')"
+
+# gru_ed1 de defunciones: 00-06 menores de 1 año, 07 un año, 08 de 2 a 4,
+# 09 a 27 quinquenios de 5-9 a 95-99, 28 de 100 y más, 29 edad desconocida.
+GRUPO_EDAD_CAUSA = f"""
+CASE
+  WHEN {GRU_ED1} BETWEEN '00' AND '06' THEN 'Menor 1 año'
+  WHEN {GRU_ED1} IN ('07', '08') THEN 'De 1-4 años'
+  WHEN {GRU_ED1} IN ('09', '10') THEN 'De 5-14 años'
+  WHEN {GRU_ED1} BETWEEN '11' AND '16' THEN 'De 15-44 años'
+  WHEN {GRU_ED1} BETWEEN '17' AND '20' THEN 'De 45-64 años'
+  WHEN {GRU_ED1} BETWEEN '21' AND '24' THEN 'De 65-84 años'
+  WHEN {GRU_ED1} BETWEEN '25' AND '27' THEN 'De 85-99 años'
+  WHEN {GRU_ED1} = '28' THEN 'De 100 y más'
+  ELSE 'Edad desconocida'
+END
 """
 
 
@@ -273,55 +313,46 @@ def cargar_tablero() -> dict:
     conn = conectar()
     try:
         with conn.cursor() as cur:
-            cur.execute("SET statement_timeout = '90s'")
+            cur.execute("SET statement_timeout = '180s'")
         nacimientos = _consultar(
             conn,
             f"""
-            SELECT f.anio,
+            SELECT f.ano::integer AS anio,
                    g.cod_departamento,
-                   g.departamento,
+                   MAX(g.departamento) AS departamento,
                    g.cod_municipio,
-                   g.municipio,
-                   COALESCE(NULLIF(f.sexo, ''), 'Indeterminado') AS sexo,
-                   SUM(f.nacimientos)::bigint AS nacimientos
-            FROM nacimientos.fact_nac_residencia f
-            {CRUCE_GEOGRAFIA}
-            GROUP BY 1, 2, 3, 4, 5, 6
-            """,
-            (),
-        )
-        defunciones = _consultar(
-            conn,
-            f"""
-            SELECT f.anio,
-                   g.cod_departamento,
-                   g.departamento,
-                   g.cod_municipio,
-                   g.municipio,
-                   COALESCE(NULLIF(f.sexo, ''), 'Indeterminado') AS sexo,
-                   SUM(f.defunciones)::bigint AS defunciones
-            FROM defunciones.fact_def_causa f
-            {CRUCE_GEOGRAFIA}
-            GROUP BY 1, 2, 3, 4, 5, 6
+                   MAX(g.municipio) AS municipio,
+                   {SEXO_MICRODATO} AS sexo,
+                   COUNT(*)::bigint AS nacimientos
+            FROM nacimientos.fact_nacimientos f
+            {CRUCE_RESIDENCIA}
+            GROUP BY 1, 2, 4, 6
             """,
             (),
         )
         causas = _consultar(
             conn,
             f"""
-            SELECT f.anio,
+            WITH catalogo AS (
+              SELECT cod_causa, MAX(causa) AS causa
+              FROM defunciones.dim_causa_defuncion
+              WHERE lista = 'agrupada'
+              GROUP BY cod_causa
+            )
+            SELECT f.ano::integer AS anio,
                    g.cod_departamento,
-                   g.departamento,
+                   MAX(g.departamento) AS departamento,
                    g.cod_municipio,
-                   g.municipio,
-                   f.cod_causa,
-                   f.causa,
-                   COALESCE(NULLIF(f.grupo_edad, ''), 'Edad desconocida') AS grupo_edad,
-                   COALESCE(NULLIF(f.sexo, ''), 'Indeterminado') AS sexo,
-                   SUM(f.defunciones)::bigint AS defunciones
-            FROM defunciones.fact_def_causa f
-            {CRUCE_GEOGRAFIA}
-            GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9
+                   MAX(g.municipio) AS municipio,
+                   {CAUSA_667} AS cod_causa,
+                   MAX(c.causa) AS causa,
+                   {GRUPO_EDAD_CAUSA} AS grupo_edad,
+                   {SEXO_MICRODATO} AS sexo,
+                   COUNT(*)::bigint AS defunciones
+            FROM defunciones.fact_defunciones f
+            {CRUCE_RESIDENCIA}
+            LEFT JOIN catalogo c ON c.cod_causa = {CAUSA_667}
+            GROUP BY 1, 2, 4, 6, 8, 9
             """,
             (),
         )
@@ -341,17 +372,20 @@ def cargar_tablero() -> dict:
     finally:
         conn.close()
 
-    for frame in (nacimientos, defunciones, causas):
+    for frame in (nacimientos, causas):
         _enteros(frame, ("anio",))
         for columna in ("cod_departamento", "departamento", "cod_municipio", "municipio"):
             frame[columna] = frame[columna].fillna("").astype(str).str.strip()
     _enteros(nacimientos, ("nacimientos",))
-    _enteros(defunciones, ("defunciones",))
     _enteros(causas, ("defunciones",))
     causas["cod_causa"] = causas["cod_causa"].fillna("").astype(str)
     causas["causa"] = causas["causa"].fillna("Sin causa").astype(str)
     causas["grupo_edad"] = causas["grupo_edad"].fillna("Edad desconocida").astype(str)
     causas["sexo"] = causas["sexo"].fillna("Indeterminado").astype(str)
+    defunciones = causas.groupby(
+        ["anio", "cod_departamento", "departamento", "cod_municipio", "municipio", "sexo"],
+        as_index=False,
+    )["defunciones"].sum()
 
     catalogo = (
         causas.groupby(["cod_causa", "causa"], as_index=False)["defunciones"]
