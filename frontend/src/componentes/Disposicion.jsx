@@ -69,8 +69,8 @@ class ErrorVista extends Component {
   }
 }
 
-export function Disposicion() {
-  const [pagina, setPagina] = useState("panorama");
+export function Disposicion({ paginaInicial = "panorama", alInicio }) {
+  const [pagina, setPagina] = useState(paginaInicial);
   const seccion = useMemo(() => seccionDe(pagina), [pagina]);
   const Vista = PAGINAS[pagina] ?? Panorama;
 
@@ -88,13 +88,7 @@ export function Disposicion() {
       <header className="encabezado">
         <div className="marca">
           <img className="marca-logo" src="/favicon.png" alt="" />
-          <div>
-            <h1>Estadísticas Vitales: Nacimientos y Defunciones</h1>
-            <p>
-              Nacimientos y defunciones en Colombia publicadas por el Departamento Administrativo Nacional
-              de Estadística (DANE)
-            </p>
-          </div>
+          <h1>Estadísticas Vitales: Nacimientos y Defunciones</h1>
         </div>
         <nav className="menu">
           {MENU.map((item) => (
@@ -123,7 +117,7 @@ export function Disposicion() {
           ))}
         </div>
       ) : null}
-      <BarraLateral pagina={pagina} />
+      <BarraLateral pagina={pagina} alInicio={alInicio} />
       <main className="contenido">
         <ErrorVista key={pagina}><Vista /></ErrorVista>
       </main>
