@@ -1,11 +1,47 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Buscador } from "@/componentes/Buscador";
 import { CAUSAS_EXTERNAS, whereTerritorio } from "@/datos/consultas";
 import { useConsulta } from "@/datos/useConsulta";
 import { useDatos } from "@/datos/DatosProvider";
 import { useFiltros } from "@/estado/FiltrosProvider";
 
-export function BarraLateral({ pagina }) {
+const PANTALLA_COMPACTA = "(max-width: 1100px)";
+const PANTALLA_MOVIL = "(max-width: 1100px) and (orientation: portrait)";
+
+function medidaPantalla() {
+  return {
+    compacta: window.matchMedia(PANTALLA_COMPACTA).matches,
+    movil: window.matchMedia(PANTALLA_MOVIL).matches,
+  };
+}
+
+function IconoFiltro() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 5h16l-6 7.5V19l-4 1.5v-8z" />
+    </svg>
+  );
+}
+
+export function BarraLateral({ pagina, alInicio }) {
+  const [pantalla, setPantalla] = useState(medidaPantalla);
+  const [abierta, setAbierta] = useState(() => !medidaPantalla().movil);
+  useEffect(() => {
+    const compacta = window.matchMedia(PANTALLA_COMPACTA);
+    const movil = window.matchMedia(PANTALLA_MOVIL);
+    const actualizar = () => {
+      const siguiente = medidaPantalla();
+      setPantalla(siguiente);
+      setAbierta(!siguiente.movil);
+    };
+    compacta.addEventListener("change", actualizar);
+    movil.addEventListener("change", actualizar);
+    return () => {
+      compacta.removeEventListener("change", actualizar);
+      movil.removeEventListener("change", actualizar);
+    };
+  }, []);
+
   const { catalogos } = useDatos();
   const { filtros, actualizar, reiniciar } = useFiltros();
   const consultaCausas =
@@ -84,12 +120,12 @@ export function BarraLateral({ pagina }) {
       ));
 
   return (
-    <aside className="barra">
+    <aside className={abierta ? "barra" : "barra cerrada"}>
+      {abierta ? (
+      <div className="barra-filtros" id="panel-filtros">
       <div className="barra-cabecera">
         <span className="barra-icono" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <path d="M4 5h16l-6 7.5V19l-4 1.5v-8z" />
-          </svg>
+          <IconoFiltro />
         </span>
         <div>
           <h2 className="barra-titulo">Filtros</h2>
@@ -97,6 +133,20 @@ export function BarraLateral({ pagina }) {
             Para información más detallada:
           </p>
         </div>
+        {pantalla.compacta ? (
+          <button
+            type="button"
+            className="alternar-filtros cerrar"
+            aria-expanded="true"
+            aria-controls="panel-filtros"
+            onClick={() => setAbierta(false)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 14.5 12 8.5l6 6" />
+            </svg>
+            Cerrar
+          </button>
+        ) : null}
       </div>
       <Buscador
         etiqueta="Año"
@@ -192,6 +242,30 @@ export function BarraLateral({ pagina }) {
           <span>Limpiar filtros</span>
         </button>
       ) : null}
+      </div>
+      ) : null}
+      <div className="barra-pie">
+        <button type="button" className="ir-portada" title="Portada" aria-label="Volver a la portada" onClick={alInicio}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 10.5 12 4l8 6.5" />
+            <path d="M6.5 9.8V20h11V9.8" />
+            <path d="M10 20v-5h4v5" />
+          </svg>
+        </button>
+        {!abierta && pantalla.compacta ? (
+          <button
+            type="button"
+            className="alternar-filtros abrir"
+            aria-expanded="false"
+            onClick={() => setAbierta(true)}
+          >
+            <span className="barra-icono" aria-hidden="true">
+              <IconoFiltro />
+            </span>
+            <span>Filtros</span>
+          </button>
+        ) : null}
+      </div>
     </aside>
   );
 }
