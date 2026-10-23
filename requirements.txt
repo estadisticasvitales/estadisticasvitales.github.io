@@ -1,6 +1,9 @@
-# Dependencias de Python (db.py y exportar_datos.py).
+# Dependencias de Python (db.py, exportar_datos.py e images_scripts/).
 # El frontend se instala aparte: cd frontend && npm install
 pandas==2.3.2
+numpy==1.26.4
 psycopg2-binary==2.9.12
 PyYAML==6.0
 pyarrow==11.0.0
+matplotlib==3.10.6
+pillow==9.4.0
